@@ -1,173 +1,100 @@
 import { gql } from '@apollo/client';
 
-// 新增志工
-export const CREATE_VOLUNTEER = gql`
-  mutation CreateVolunteer(
-    $name: String!
-    $phone: String!
-    $member_count: Int
-    $nickname: String
-    $notes: String
-  ) {
-    insert_volunteers_one(
-      object: {
-        name: $name
-        phone: $phone
-        member_count: $member_count
-        nickname: $nickname
-        notes: $notes
-      }
-    ) {
+// 查詢所有志工
+export const GET_VOLUNTEERS = gql`
+  query GetVolunteers {
+    volunteers(order_by: { created_at: desc }) {
       id
       name
       phone
       member_count
+      nickname
       status
+      notes
+      created_at
     }
   }
 `;
 
-// 更新志工
-export const UPDATE_VOLUNTEER = gql`
-  mutation UpdateVolunteer(
-    $id: uuid!
-    $name: String
-    $phone: String
-    $member_count: Int
-    $nickname: String
-    $notes: String
-    $status: String
-  ) {
-    update_volunteers_by_pk(
-      pk_columns: { id: $id }
-      _set: {
-        name: $name
-        phone: $phone
-        member_count: $member_count
-        nickname: $nickname
-        notes: $notes
-        status: $status
-      }
-    ) {
+// 查詢所有需求
+export const GET_REQUESTS = gql`
+  query GetRequests {
+    disaster_requests(order_by: { created_at: desc }) {
       id
-      name
-      phone
-      status
-    }
-  }
-`;
-
-// 刪除志工
-export const DELETE_VOLUNTEER = gql`
-  mutation DeleteVolunteer($id: uuid!) {
-    delete_volunteers_by_pk(id: $id) {
-      id
-      name
-    }
-  }
-`;
-
-// 新增需求
-export const CREATE_REQUEST = gql`
-  mutation CreateRequest(
-    $request_type: String!
-    $village: String!
-    $street: String!
-    $contact_name: String!
-    $contact_phone: String!
-    $description: String!
-    $required_volunteers: Int
-    $priority: String
-    $address_detail: String
-    $notes: String
-  ) {
-    insert_disaster_requests_one(
-      object: {
-        request_type: $request_type
-        village: $village
-        street: $street
-        contact_name: $contact_name
-        contact_phone: $contact_phone
-        description: $description
-        required_volunteers: $required_volunteers
-        priority: $priority
-        address_detail: $address_detail
-        notes: $notes
-      }
-    ) {
-      id
+      request_type
+      priority
+      township
+      village
+      street
+      address_detail
+      contact_name
+      contact_phone
       description
+      required_volunteers
       status
+      notes
+      created_at
     }
   }
 `;
 
-// 更新需求
-export const UPDATE_REQUEST = gql`
-  mutation UpdateRequest(
-    $id: uuid!
-    $request_type: String
-    $village: String
-    $street: String
-    $contact_name: String
-    $contact_phone: String
-    $description: String
-    $required_volunteers: Int
-    $priority: String
-    $status: String
-  ) {
-    update_disaster_requests_by_pk(
-      pk_columns: { id: $id }
-      _set: {
-        request_type: $request_type
-        village: $village
-        street: $street
-        contact_name: $contact_name
-        contact_phone: $contact_phone
-        description: $description
-        required_volunteers: $required_volunteers
-        priority: $priority
-        status: $status
-      }
-    ) {
-      id
-      description
-      status
-    }
-  }
-`;
-
-// 建立派單
-export const CREATE_ASSIGNMENT = gql`
-  mutation CreateAssignment($volunteer_id: uuid!, $request_id: uuid!) {
-    insert_assignments_one(
-      object: { 
-        volunteer_id: $volunteer_id
-        request_id: $request_id 
-      }
-    ) {
+// 查詢所有派單
+export const GET_ASSIGNMENTS = gql`
+  query GetAssignments {
+    assignments(order_by: { assigned_at: desc }) {
       id
       status
+      assigned_at
+      confirmed_at
+      completed_at
       volunteer {
+        id
         name
         phone
+        member_count
       }
       disaster_request {
+        id
         description
+        village
+        street
+        contact_name
+        contact_phone
       }
     }
   }
 `;
 
-// 更新派單狀態
-export const UPDATE_ASSIGNMENT_STATUS = gql`
-  mutation UpdateAssignmentStatus($id: uuid!, $status: String!) {
-    update_assignments_by_pk(
-      pk_columns: { id: $id }
-      _set: { status: $status }
+// 儀表板統計數據
+export const GET_DASHBOARD_STATS = gql`
+  query GetDashboardStats {
+    available_volunteers: volunteers_aggregate(
+      where: { status: { _eq: "available" } }
     ) {
-      id
-      status
+      aggregate {
+        count
+      }
+    }
+    pending_requests: disaster_requests_aggregate(
+      where: { status: { _eq: "pending" } }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    in_progress_assignments: assignments_aggregate(
+      where: { status: { _in: ["pending", "confirmed", "in_progress"] } }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    completed_assignments: assignments_aggregate(
+      where: { status: { _eq: "completed" } }
+    ) {
+      aggregate {
+        count
+      }
     }
   }
 `;
