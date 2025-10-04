@@ -1,5 +1,62 @@
 import { gql } from '@apollo/client';
 
+// 志工登入驗證
+export const VERIFY_VOLUNTEER = gql`
+  query VerifyVolunteer($phone: String!, $name: String!) {
+    volunteers(
+      where: {
+        phone: { _eq: $phone }
+        name: { _eq: $name }
+      }
+      limit: 1
+    ) {
+      id
+      name
+      phone
+      email
+      member_count
+      nickname
+      status
+      notes
+      created_at
+    }
+  }
+`;
+
+// 取得志工完整資料（包含派單）
+export const GET_VOLUNTEER_PROFILE = gql`
+  query GetVolunteerProfile($id: uuid!) {
+    volunteers_by_pk(id: $id) {
+      id
+      name
+      phone
+      email
+      member_count
+      nickname
+      status
+      notes
+      created_at
+      assignments(order_by: { assigned_at: desc }) {
+        id
+        status
+        assigned_at
+        confirmed_at
+        completed_at
+        disaster_request {
+          id
+          description
+          village
+          street
+          contact_name
+          contact_phone
+          priority
+          request_type
+        }
+      }
+    }
+  }
+`;
+
 // 查詢所有志工
 export const GET_VOLUNTEERS = gql`
   query GetVolunteers {
