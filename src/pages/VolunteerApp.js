@@ -1,10 +1,14 @@
+// src/pages/VolunteerApp.jsx
 import React, { useState } from 'react';
 import { Bell, MapPin, Phone, Clock, CheckCircle, AlertCircle, User, LogOut, Home } from 'lucide-react';
+import { useQuery, useMutation } from '@apollo/client';
+import { GET_ASSIGNMENTS } from '../graphql/queries';
+import { UPDATE_ASSIGNMENT_STATUS } from '../graphql/mutations';
 
-export default function VolunteerMobileApp() {
+export default function VolunteerApp() {
   const [currentPage, setCurrentPage] = useState('home');
   const [volunteer] = useState({
-    id: 'V-001',
+    id: 'e3b0c442-98fc-1c14-9afb-f4c8996fb924', // 替換為實際志工ID
     name: '林志明',
     phone: '0912-345-678',
     memberCount: 3,
@@ -33,8 +37,8 @@ export default function VolunteerMobileApp() {
 
       {/* 主要內容 */}
       <div className="p-4">
-        {currentPage === 'home' && <HomePage />}
-        {currentPage === 'tasks' && <TasksPage />}
+        {currentPage === 'home' && <HomePage volunteerId={volunteer.id} />}
+        {currentPage === 'tasks' && <TasksPage volunteerId={volunteer.id} />}
         {currentPage === 'profile' && <ProfilePage volunteer={volunteer} />}
       </div>
 
@@ -87,7 +91,13 @@ function NavButton({ icon, label, active, onClick, badge }) {
   );
 }
 
-function HomePage() {
+function HomePage({ volunteerId }) {
+  const { data } = useQuery(GET_ASSIGNMENTS);
+  
+  const myAssignments = data?.assignments?.filter(a => a.volunteer.id === volunteerId) || [];
+  const pendingCount = myAssignments.filter(a => a.status === 'pending').length;
+  const completedCount = myAssignments.filter(a => a.status === 'completed').length;
+
   return (
     <div className="space-y-4">
       {/* 狀態卡片 */}
@@ -103,25 +113,14 @@ function HomePage() {
         </div>
         <div className="flex items-center space-x-4 text-sm">
           <div>
-            <p className="text-red-100">可派遣人數</p>
-            <p className="text-xl font-bold">3 人</p>
+            <p className="text-red-100">待確認</p>
+            <p className="text-xl font-bold">{pendingCount} 件</p>
           </div>
           <div className="h-8 w-px bg-white bg-opacity-30"></div>
           <div>
-            <p className="text-red-100">完成任務</p>
-            <p className="text-xl font-bold">12 件</p>
+            <p className="text-red-100">已完成</p>
+            <p className="text-xl font-bold">{completedCount} 件</p>
           </div>
-        </div>
-      </div>
-
-      {/* 快速切換狀態 */}
-      <div className="bg-white rounded-xl shadow-md p-4">
-        <h3 className="font-bold text-gray-800 mb-3">快速切換狀態</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <StatusButton status="available" label="可派遣" color="green" active />
-          <StatusButton status="busy" label="忙碌中" color="yellow" />
-          <StatusButton status="inactive" label="暫時離線" color="gray" />
-          <StatusButton status="assigned" label="執行中" color="blue" disabled />
         </div>
       </div>
 
@@ -130,100 +129,67 @@ function HomePage() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-gray-800">待確認派單</h3>
           <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-1 rounded-full">
-            2 件
+            {pendingCount} 件
           </span>
         </div>
         <div className="space-y-3">
-          <PendingAssignment
-            id="DR-089"
-            location="光復鄉 東富村 佛祖街"
-            description="協助清淤作業"
-            time="30分鐘前"
-            urgent
-          />
-          <PendingAssignment
-            id="DR-091"
-            location="光復鄉 大興村 民族街"
-            description="協助搬運物資"
-            time="1小時前"
-          />
-        </div>
-      </div>
-
-      {/* 今日統計 */}
-      <div className="bg-white rounded-xl shadow-md p-4">
-        <h3 className="font-bold text-gray-800 mb-3">今日統計</h3>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p className="text-2xl font-bold text-blue-600">2</p>
-            <p className="text-xs text-gray-600">接受任務</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-green-600">1</p>
-            <p className="text-xs text-gray-600">完成任務</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-gray-600">6.5</p>
-            <p className="text-xs text-gray-600">服務時數</p>
-          </div>
+          {myAssignments
+            .filter(a => a.status === 'pending')
+            .map(assignment => (
+              <PendingAssignment
+                key={assignment.id}
+                assignment={assignment}
+              />
+            ))}
         </div>
       </div>
     </div>
   );
 }
 
-function StatusButton({ status, label, color, active, disabled }) {
-  const colors = {
-    green: 'border-green-500 text-green-700',
-    yellow: 'border-yellow-500 text-yellow-700',
-    gray: 'border-gray-400 text-gray-700',
-    blue: 'border-blue-500 text-blue-700',
+function PendingAssignment({ assignment }) {
+  const [updateStatus] = useMutation(UPDATE_ASSIGNMENT_STATUS, {
+    refetchQueries: [{ query: GET_ASSIGNMENTS }]
+  });
+
+  const handleAccept = async () => {
+    try {
+      await updateStatus({
+        variables: {
+          id: assignment.id,
+          status: 'confirmed'
+        }
+      });
+      alert('已接受任務！');
+    } catch (err) {
+      alert('操作失敗: ' + err.message);
+    }
   };
 
-  const activeColors = {
-    green: 'bg-green-500 text-white border-green-500',
-    yellow: 'bg-yellow-500 text-white border-yellow-500',
-    gray: 'bg-gray-400 text-white border-gray-400',
-    blue: 'bg-blue-500 text-white border-blue-500',
-  };
-
-  return (
-    <button
-      disabled={disabled}
-      className={`p-3 rounded-lg border-2 font-medium text-sm transition ${
-        disabled
-          ? 'opacity-50 cursor-not-allowed bg-gray-100'
-          : active
-          ? activeColors[color]
-          : `${colors[color]} hover:bg-${color}-50`
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function PendingAssignment({ id, location, description, time, urgent }) {
   return (
     <div className="border-2 border-red-200 rounded-lg p-4 bg-red-50">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center space-x-2">
-          <span className="font-bold text-gray-800">{id}</span>
-          {urgent && (
-            <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-              緊急
-            </span>
-          )}
+          <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+            緊急
+          </span>
         </div>
-        <span className="text-xs text-gray-500">{time}</span>
+        <span className="text-xs text-gray-500">
+          {new Date(assignment.assigned_at).toLocaleString('zh-TW')}
+        </span>
       </div>
       <div className="flex items-start space-x-2 mb-3">
         <MapPin className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-        <p className="text-sm text-gray-700">{location}</p>
+        <p className="text-sm text-gray-700">
+          {assignment.disaster_request.village} {assignment.disaster_request.street}
+        </p>
       </div>
-      <p className="text-sm text-gray-700 mb-4">{description}</p>
+      <p className="text-sm text-gray-700 mb-4">{assignment.disaster_request.description}</p>
       <div className="flex space-x-2">
-        <button className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium transition">
+        <button 
+          onClick={handleAccept}
+          className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium transition"
+        >
           接受任務
         </button>
         <button className="px-4 border-2 border-gray-300 hover:bg-gray-50 text-gray-700 py-2 rounded-lg font-medium transition">
@@ -234,43 +200,19 @@ function PendingAssignment({ id, location, description, time, urgent }) {
   );
 }
 
-function TasksPage() {
+function TasksPage({ volunteerId }) {
   const [filter, setFilter] = useState('all');
+  const { data } = useQuery(GET_ASSIGNMENTS);
 
-  const tasks = [
-    {
-      id: 'A-001',
-      requestId: 'DR-089',
-      location: '光復鄉 東富村 佛祖街',
-      description: '協助清淤作業',
-      status: 'pending',
-      time: '30分鐘前',
-    },
-    {
-      id: 'A-002',
-      requestId: 'DR-085',
-      location: '光復鄉 大興村 光豐路',
-      description: '協助搬運物資',
-      status: 'in_progress',
-      startTime: '09:30',
-    },
-    {
-      id: 'A-003',
-      requestId: 'DR-078',
-      location: '光復鄉 大富村 民生路',
-      description: '道路清理',
-      status: 'completed',
-      completedTime: '昨天 16:45',
-    },
-  ];
+  const myAssignments = data?.assignments?.filter(a => a.volunteer.id === volunteerId) || [];
+  const filteredTasks = filter === 'all' ? myAssignments : myAssignments.filter(t => t.status === filter);
 
   const statusConfig = {
     pending: { label: '待確認', color: 'yellow', icon: <Clock /> },
+    confirmed: { label: '已確認', color: 'green', icon: <CheckCircle /> },
     in_progress: { label: '進行中', color: 'blue', icon: <AlertCircle /> },
-    completed: { label: '已完成', color: 'green', icon: <CheckCircle /> },
+    completed: { label: '已完成', color: 'gray', icon: <CheckCircle /> },
   };
-
-  const filteredTasks = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
 
   return (
     <div className="space-y-4">
@@ -279,9 +221,22 @@ function TasksPage() {
       {/* 篩選器 */}
       <div className="flex space-x-2 overflow-x-auto pb-2">
         <FilterChip label="全部" active={filter === 'all'} onClick={() => setFilter('all')} />
-        <FilterChip label="待確認" active={filter === 'pending'} onClick={() => setFilter('pending')} badge={2} />
-        <FilterChip label="進行中" active={filter === 'in_progress'} onClick={() => setFilter('in_progress')} badge={1} />
-        <FilterChip label="已完成" active={filter === 'completed'} onClick={() => setFilter('completed')} />
+        <FilterChip 
+          label="待確認" 
+          active={filter === 'pending'} 
+          onClick={() => setFilter('pending')} 
+          badge={myAssignments.filter(a => a.status === 'pending').length} 
+        />
+        <FilterChip 
+          label="已確認" 
+          active={filter === 'confirmed'} 
+          onClick={() => setFilter('confirmed')} 
+        />
+        <FilterChip 
+          label="已完成" 
+          active={filter === 'completed'} 
+          onClick={() => setFilter('completed')} 
+        />
       </div>
 
       {/* 任務列表 */}
@@ -290,52 +245,30 @@ function TasksPage() {
           <div key={task.id} className="bg-white rounded-xl shadow-md p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <span className="font-bold text-gray-800">{task.requestId}</span>
                 <span className={`flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full bg-${statusConfig[task.status].color}-100 text-${statusConfig[task.status].color}-800`}>
                   {React.cloneElement(statusConfig[task.status].icon, { className: 'w-3 h-3' })}
                   <span>{statusConfig[task.status].label}</span>
                 </span>
               </div>
               <span className="text-xs text-gray-500">
-                {task.time || task.startTime || task.completedTime}
+                {new Date(task.assigned_at).toLocaleString('zh-TW')}
               </span>
             </div>
 
             <div className="flex items-start space-x-2 mb-2">
               <MapPin className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-gray-700">{task.location}</p>
+              <p className="text-sm text-gray-700">
+                {task.disaster_request.village} {task.disaster_request.street}
+              </p>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">{task.description}</p>
+            <p className="text-sm text-gray-600 mb-4">{task.disaster_request.description}</p>
 
-            {task.status === 'pending' && (
-              <div className="flex space-x-2">
-                <button className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-medium transition">
-                  接受任務
-                </button>
-                <button className="flex-1 border-2 border-gray-300 hover:bg-gray-50 text-gray-700 py-2 rounded-lg text-sm font-medium transition">
-                  拒絕
-                </button>
-              </div>
-            )}
-
-            {task.status === 'in_progress' && (
-              <div className="space-y-2">
-                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center space-x-2">
-                  <Phone className="w-4 h-4" />
-                  <span>聯絡受災戶</span>
-                </button>
-                <button className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition">
-                  完成任務
-                </button>
-              </div>
-            )}
-
-            {task.status === 'completed' && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center space-x-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span className="text-sm text-green-800 font-medium">任務已完成，感謝您的付出！</span>
-              </div>
+            {task.status === 'confirmed' && (
+              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center space-x-2">
+                <Phone className="w-4 h-4" />
+                <span>聯絡受災戶 {task.disaster_request.contact_phone}</span>
+              </button>
             )}
           </div>
         ))}
@@ -355,7 +288,7 @@ function FilterChip({ label, active, onClick, badge }) {
       }`}
     >
       {label}
-      {badge && (
+      {badge > 0 && (
         <span className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
           {badge}
         </span>
@@ -396,51 +329,11 @@ function ProfilePage({ volunteer }) {
         </button>
       </div>
 
-      {/* 服務統計 */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h3 className="font-bold text-gray-800 mb-4">服務統計</h3>
-        <div className="space-y-3">
-          <StatRow label="總服務時數" value="48.5 小時" />
-          <StatRow label="本月服務" value="12.5 小時" />
-          <StatRow label="本週服務" value="6.5 小時" />
-          <StatRow label="服務起始日" value="2024-09-15" />
-        </div>
-      </div>
-
-      {/* 設定選項 */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <SettingItem icon={<Bell />} label="通知設定" />
-        <SettingItem icon={<Phone />} label="聯絡方式" />
-        <SettingItem icon={<AlertCircle />} label="緊急聯絡人" />
-        <SettingItem icon={<LogOut />} label="登出" danger />
-      </div>
-
       {/* 版本資訊 */}
       <div className="text-center text-sm text-gray-500 py-4">
         <p>花蓮縣光復救災資源管理系統</p>
         <p>志工版 v1.0.0</p>
       </div>
     </div>
-  );
-}
-
-function StatRow({ label, value }) {
-  return (
-    <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-600">{label}</span>
-      <span className="text-sm font-medium text-gray-800">{value}</span>
-    </div>
-  );
-}
-
-function SettingItem({ icon, label, danger }) {
-  return (
-    <button className={`w-full flex items-center space-x-3 p-4 hover:bg-gray-50 transition border-b border-gray-100 last:border-0 ${danger ? 'text-red-600' : 'text-gray-700'}`}>
-      {React.cloneElement(icon, { className: 'w-5 h-5' })}
-      <span className="flex-1 text-left font-medium">{label}</span>
-      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-      </svg>
-    </button>
   );
 }
