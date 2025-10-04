@@ -8,14 +8,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* 管理員端 */}
         <Route path="/" element={<AdminApp />} />
         <Route path="/admin" element={<AdminApp />} />
-        
-        {/* 志工端 */}
         <Route path="/volunteer" element={<VolunteerApp />} />
-        
-        {/* 404 頁面 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

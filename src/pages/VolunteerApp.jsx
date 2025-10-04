@@ -8,8 +8,8 @@ import { UPDATE_ASSIGNMENT_STATUS } from '../graphql/mutations';
 export default function VolunteerApp() {
   const [currentPage, setCurrentPage] = useState('home');
   const [volunteer] = useState({
-    id: 'e3b0c442-98fc-1c14-9afb-f4c8996fb924', // 替換為實際志工ID
-    name: '林志明',
+    id: '9e161402-840e-40cb-bd78-902607963728', // 替換為實際志工ID
+    name: '王',
     phone: '0912-345-678',
     memberCount: 3,
   });
