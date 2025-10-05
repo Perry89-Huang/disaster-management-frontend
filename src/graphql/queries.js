@@ -433,13 +433,17 @@ export const GET_PENDING_REQUESTS_WITH_STATS = gql`
   }
 `;
 
-// 批次派單 mutation
+// 批次派單 mutation - 支援重複派單（upsert）
 export const BATCH_ASSIGN_VOLUNTEERS = gql`
   mutation BatchAssignVolunteers(
     $assignments: [assignments_insert_input!]!
   ) {
     insert_assignments(
       objects: $assignments
+      on_conflict: {
+        constraint: assignments_volunteer_id_request_id_key
+        update_columns: [status, assigned_at, rejected_at, rejection_reason, cancelled_at, cancellation_reason]
+      }
     ) {
       affected_rows
       returning {

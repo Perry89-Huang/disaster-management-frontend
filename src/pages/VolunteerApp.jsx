@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useLazyQuery } from '@apollo/client';
-import { Bell, MapPin, Phone, Clock, CheckCircle, AlertCircle, User, LogOut, Home, Mail, Users, ArrowRight, Power, XCircle, Check, X } from 'lucide-react';
+import { Bell, MapPin, Phone, Clock, CheckCircle, AlertCircle, User, LogOut, Home, Mail, Users, ArrowRight, Power, XCircle, Check, X, Ban } from 'lucide-react';
 import {
   VOLUNTEER_GO_ONLINE,
   VOLUNTEER_GO_OFFLINE,
@@ -577,7 +577,8 @@ function TasksPage({ volunteer, setVolunteer }) {
     pending: { label: '待確認', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: <Clock /> },
     confirmed: { label: '已確認', color: 'bg-green-100 text-green-800 border-green-300', icon: <CheckCircle /> },
     rejected: { label: '已拒絕', color: 'bg-red-100 text-red-800 border-red-300', icon: <XCircle /> },
-    completed: { label: '已完成', color: 'bg-gray-100 text-gray-800 border-gray-300', icon: <CheckCircle /> }
+    cancelled: { label: '已取消', color: 'bg-gray-100 text-gray-800 border-gray-300', icon: <Ban /> },
+    completed: { label: '已完成', color: 'bg-green-100 text-green-800 border-green-300', icon: <CheckCircle /> }
   };
 
   // V3: 志工完成任務
@@ -614,6 +615,7 @@ function TasksPage({ volunteer, setVolunteer }) {
         <FilterChip label="全部" active={filter === 'all'} onClick={() => setFilter('all')} count={assignments.length} />
         <FilterChip label="待確認" active={filter === 'pending'} onClick={() => setFilter('pending')} count={assignments.filter(a => a.status === 'pending').length} />
         <FilterChip label="已確認" active={filter === 'confirmed'} onClick={() => setFilter('confirmed')} count={assignments.filter(a => a.status === 'confirmed').length} />
+        <FilterChip label="已取消" active={filter === 'cancelled'} onClick={() => setFilter('cancelled')} count={assignments.filter(a => a.status === 'cancelled').length} />
         <FilterChip label="已完成" active={filter === 'completed'} onClick={() => setFilter('completed')} count={assignments.filter(a => a.status === 'completed').length} />
       </div>
 

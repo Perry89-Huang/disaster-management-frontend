@@ -224,18 +224,27 @@ export const UPDATE_REQUEST = gql`
 
 // ========== 派單流程 Mutations ==========
 
-// A1: 管理員派單（需同時更新志工和需求狀態）
+// A1: 管理員派單（需同時更新志工和需求狀態）- 支援重複派單
 export const ASSIGN_VOLUNTEER = gql`
   mutation AssignVolunteer(
     $volunteer_id: uuid!
     $request_id: uuid!
   ) {
-    # 建立派單記錄（status: pending）
+    # 建立派單記錄（status: pending），如果已存在則更新
     insert_assignments_one(
       object: {
         volunteer_id: $volunteer_id
         request_id: $request_id
         status: "pending"
+        assigned_at: "now()"
+        rejected_at: null
+        rejection_reason: null
+        cancelled_at: null
+        cancellation_reason: null
+      }
+      on_conflict: {
+        constraint: assignments_volunteer_id_request_id_key
+        update_columns: [status, assigned_at, rejected_at, rejection_reason, cancelled_at, cancellation_reason]
       }
     ) {
       id

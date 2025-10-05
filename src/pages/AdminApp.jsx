@@ -1062,12 +1062,19 @@ function AssignmentManagement() {
 
   const [batchAssign] = useMutation(gql`
     mutation BatchAssign($assignments: [assignments_insert_input!]!) {
-      insert_assignments(objects: $assignments) {
+      insert_assignments(
+        objects: $assignments
+        on_conflict: {
+          constraint: assignments_volunteer_id_request_id_key
+          update_columns: [status, assigned_at, rejected_at, rejection_reason, cancelled_at, cancellation_reason]
+        }
+      ) {
         affected_rows
         returning {
           id
           volunteer_id
           request_id
+          status
         }
       }
     }
@@ -1146,7 +1153,13 @@ function AssignmentManagement() {
       const assignmentObjects = selectedVolunteers.map(volunteerId => ({
         volunteer_id: volunteerId,
         request_id: selectedRequest,
-        status: 'pending'
+        status: 'pending',
+        assigned_at: new Date().toISOString(),
+        // 清除之前的拒絕/取消記錄
+        rejected_at: null,
+        rejection_reason: null,
+        cancelled_at: null,
+        cancellation_reason: null
       }));
 
       await batchAssign({
@@ -1477,7 +1490,7 @@ function AssignmentManagement() {
                         派單時間: {new Date(assignment.assigned_at).toLocaleString('zh-TW')}
                       </p>
                     </div>
-                    {(assignment.status === 'pending' || assignment.status === 'confirmed') && (
+                    {assignment.status === 'pending' && (
                       <button 
                         onClick={() => handleCancelAssignment(assignment)}
                         className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium shadow ml-4"
