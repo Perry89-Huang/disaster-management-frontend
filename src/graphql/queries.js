@@ -123,11 +123,11 @@ export const GET_REQUESTS = gql`
   }
 `;
 
-// 查詢待支援需求（pending 狀態）
+// 查詢待支援需求（pending 和 in_progress 狀態）
 export const GET_PENDING_REQUESTS = gql`
   query GetPendingRequests {
     disaster_requests(
-      where: { status: { _eq: "pending" } }
+      where: { status: { _in: ["pending", "in_progress"] } }
       order_by: { priority: asc, created_at: desc }
     ) {
       id
@@ -250,15 +250,6 @@ export const GET_DASHBOARD_STATS = gql`
       }
     }
     
-    # 派單中需求（assigning狀態）
-    assigning_requests: disaster_requests_aggregate(
-      where: { status: { _eq: "assigning" } }
-    ) {
-      aggregate {
-        count
-      }
-    }
-    
     # 進行中需求（in_progress狀態）
     in_progress_requests: disaster_requests_aggregate(
       where: { status: { _eq: "in_progress" } }
@@ -271,6 +262,15 @@ export const GET_DASHBOARD_STATS = gql`
     # 已完成需求
     completed_requests: disaster_requests_aggregate(
       where: { status: { _eq: "completed" } }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    
+    # 已取消需求
+    cancelled_requests: disaster_requests_aggregate(
+      where: { status: { _eq: "cancelled" } }
     ) {
       aggregate {
         count
@@ -392,7 +392,7 @@ export const GET_REQUEST_WITH_ASSIGNMENTS = gql`
 export const GET_PENDING_REQUESTS_WITH_STATS = gql`
   query GetPendingRequestsWithStats {
     disaster_requests(
-      where: { status: { _in: ["pending", "assigning"] } }
+      where: { status: { _in: ["pending", "in_progress"] } }
       order_by: { priority: asc, created_at: desc }
     ) {
       id

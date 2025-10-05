@@ -224,7 +224,7 @@ export const UPDATE_REQUEST = gql`
 
 // ========== 派單流程 Mutations ==========
 
-// A1: 管理員派單（需同時更新志工和需求狀態）- 支援重複派單
+// A1: 管理員派單（新版流程：pending → in_progress）
 export const ASSIGN_VOLUNTEER = gql`
   mutation AssignVolunteer(
     $volunteer_id: uuid!
@@ -269,10 +269,10 @@ export const ASSIGN_VOLUNTEER = gql`
       status
     }
     
-    # 更新需求狀態：pending → assigning
+    # 更新需求狀態：pending → in_progress（一派單就進入進行中）
     update_disaster_requests_by_pk(
       pk_columns: { id: $request_id }
-      _set: { status: "assigning" }
+      _set: { status: "in_progress" }
     ) {
       id
       status
@@ -280,7 +280,7 @@ export const ASSIGN_VOLUNTEER = gql`
   }
 `;
 
-// V1: 志工確認派單（需同時更新所有相關狀態）
+// V1: 志工確認派單
 export const CONFIRM_ASSIGNMENT = gql`
   mutation ConfirmAssignment(
     $assignment_id: uuid!
@@ -309,14 +309,7 @@ export const CONFIRM_ASSIGNMENT = gql`
       status
     }
     
-    # 更新需求狀態：assigning → in_progress
-    update_disaster_requests_by_pk(
-      pk_columns: { id: $request_id }
-      _set: { status: "in_progress" }
-    ) {
-      id
-      status
-    }
+    # 需求已經在派單時變成 in_progress，這裡不需要更新
   }
 `;
 
@@ -351,14 +344,8 @@ export const REJECT_ASSIGNMENT = gql`
       status
     }
     
-    # 更新需求狀態：assigning → pending（重新等待派單）
-    update_disaster_requests_by_pk(
-      pk_columns: { id: $request_id }
-      _set: { status: "pending" }
-    ) {
-      id
-      status
-    }
+    # 需求狀態維持 in_progress（因為可能還有其他志工在處理）
+    # 如果需要檢查是否所有志工都拒絕，需要在後端 action 處理
   }
 `;
 
@@ -393,14 +380,8 @@ export const CANCEL_ASSIGNMENT = gql`
       status
     }
     
-    # 更新需求狀態 → pending
-    update_disaster_requests_by_pk(
-      pk_columns: { id: $request_id }
-      _set: { status: "pending" }
-    ) {
-      id
-      status
-    }
+    # 需求狀態維持 in_progress（因為可能還有其他志工在處理）
+    # 如果需要取消整個需求，使用 CANCEL_REQUEST mutation
   }
 `;
 
@@ -433,10 +414,47 @@ export const COMPLETE_ASSIGNMENT = gql`
       status
     }
     
-    # 更新需求狀態：in_progress → completed
+    # 檢查需求是否所有派單都完成，如果是則更新為 completed
+    # 這部分需要在後端 action 處理，或使用以下邏輯手動完成
     update_disaster_requests_by_pk(
       pk_columns: { id: $request_id }
       _set: { status: "completed" }
+    ) {
+      id
+      status
+    }
+  }
+`;
+
+// A2/R2: 取消整個需求（管理員或受災戶）
+export const CANCEL_REQUEST = gql`
+  mutation CancelRequest(
+    $request_id: uuid!
+    $cancellation_reason: String
+  ) {
+    # 取消所有相關的派單
+    update_assignments(
+      where: { 
+        request_id: { _eq: $request_id }
+        status: { _in: ["pending", "confirmed"] }
+      }
+      _set: { 
+        status: "cancelled"
+        cancelled_at: "now()"
+        cancellation_reason: $cancellation_reason
+      }
+    ) {
+      affected_rows
+      returning {
+        id
+        volunteer_id
+      }
+    }
+    
+    # 更新需求狀態為 cancelled
+    update_disaster_requests_by_pk(
+      pk_columns: { id: $request_id }
+      _set: { status: "cancelled" }
     ) {
       id
       status

@@ -27,7 +27,7 @@ import {
 const GET_PENDING_REQUESTS_WITH_STATS = gql`
   query GetPendingRequestsWithStats {
     disaster_requests(
-      where: { status: { _in: ["pending", "assigning"] } }
+      where: { status: { _in: ["pending", "in_progress"] } }
       order_by: { priority: asc, created_at: desc }
     ) {
       id
@@ -81,7 +81,7 @@ export default function AdminApp() {
               </div>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold tracking-tight">花蓮縣光復救災資源管理系統</h1>
-                <p className="text-xs text-red-100 hidden sm:block">Disaster Resource Management System v2.0</p>
+                <p className="text-xs text-red-100 hidden sm:block">Disaster Resource Management System v2.1</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -165,8 +165,9 @@ function Dashboard() {
     { label: '離線志工', value: data?.offline_volunteers?.aggregate?.count || 0, color: 'gray', bgColor: 'bg-gradient-to-br from-gray-400 to-gray-600', icon: <Power className="w-8 h-8" />, detail: 'off' },
     { label: '執行中志工', value: data?.assigned_volunteers?.aggregate?.count || 0, color: 'blue', bgColor: 'bg-gradient-to-br from-blue-400 to-blue-600', icon: <CheckCircle className="w-8 h-8" />, detail: 'assigned' },
     { label: '待支援需求', value: data?.pending_requests?.aggregate?.count || 0, color: 'red', bgColor: 'bg-gradient-to-br from-red-400 to-red-600', icon: <AlertTriangle className="w-8 h-8" />, detail: 'pending' },
-    { label: '派單中需求', value: data?.assigning_requests?.aggregate?.count || 0, color: 'yellow', bgColor: 'bg-gradient-to-br from-yellow-400 to-yellow-600', icon: <Clock className="w-8 h-8" />, detail: 'assigning' },
-    { label: '進行中需求', value: data?.in_progress_requests?.aggregate?.count || 0, color: 'indigo', bgColor: 'bg-gradient-to-br from-indigo-400 to-indigo-600', icon: <Send className="w-8 h-8" />, detail: 'in_progress' }
+    { label: '進行中需求', value: data?.in_progress_requests?.aggregate?.count || 0, color: 'indigo', bgColor: 'bg-gradient-to-br from-indigo-400 to-indigo-600', icon: <Send className="w-8 h-8" />, detail: 'in_progress' },
+    { label: '已完成需求', value: data?.completed_requests?.aggregate?.count || 0, color: 'green', bgColor: 'bg-gradient-to-br from-green-400 to-green-600', icon: <CheckCircle className="w-8 h-8" />, detail: 'completed' },
+    { label: '已取消需求', value: data?.cancelled_requests?.aggregate?.count || 0, color: 'gray', bgColor: 'bg-gradient-to-br from-gray-400 to-gray-600', icon: <XCircle className="w-8 h-8" />, detail: 'cancelled' }
   ];
 
   return (
@@ -225,23 +226,26 @@ function Dashboard() {
           </div>
 
           <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-            <h3 className="font-bold text-orange-800 mb-3">需求狀態流程</h3>
+            <h3 className="font-bold text-orange-800 mb-3">需求狀態流程（新版）</h3>
             <div className="space-y-2 text-sm">
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                 <span className="text-gray-700">A3/R1建立 → pending</span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span className="text-gray-700">pending → A1派單 → assigning</span>
-              </div>
-              <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                <span className="text-gray-700">assigning → V1確認 → in_progress</span>
+                <span className="text-gray-700">pending → A1派單 → in_progress</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span className="text-gray-700">in_progress → V3完成 → completed</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                <span className="text-gray-700">任何狀態 → A2/R2 → cancelled</span>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded p-2 mt-2">
+                <p className="text-xs text-blue-700">💡 一個需求可派給多個志工</p>
               </div>
             </div>
           </div>
@@ -594,9 +598,9 @@ function RequestManagement() {
 
   const statusConfig = {
     pending: { label: '待支援', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: <AlertTriangle /> },
-    assigning: { label: '派單中', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: <Clock /> },
     in_progress: { label: '進行中', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: <Send /> },
-    completed: { label: '已完成', color: 'bg-gray-100 text-gray-800 border-gray-300', icon: <CheckCircle /> }
+    completed: { label: '已完成', color: 'bg-green-100 text-green-800 border-green-300', icon: <CheckCircle /> },
+    cancelled: { label: '已取消', color: 'bg-gray-100 text-gray-800 border-gray-300', icon: <XCircle /> }
   };
 
   const priorityConfig = {
@@ -675,9 +679,9 @@ function RequestManagement() {
 
   const stats = {
     pending: requests.filter(r => r.status === 'pending').length,
-    assigning: requests.filter(r => r.status === 'assigning').length,
     in_progress: requests.filter(r => r.status === 'in_progress').length,
-    completed: requests.filter(r => r.status === 'completed').length
+    completed: requests.filter(r => r.status === 'completed').length,
+    cancelled: requests.filter(r => r.status === 'cancelled').length
   };
 
   return (
@@ -705,14 +709,6 @@ function RequestManagement() {
           <p className="text-3xl font-bold text-orange-800">{stats.pending}</p>
           <p className="text-xs text-orange-600 mt-1">pending</p>
         </div>
-        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-yellow-700 text-sm font-semibold">派單中</span>
-            <Clock className="w-5 h-5 text-yellow-600" />
-          </div>
-          <p className="text-3xl font-bold text-yellow-800">{stats.assigning}</p>
-          <p className="text-xs text-yellow-600 mt-1">assigning</p>
-        </div>
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-blue-700 text-sm font-semibold">進行中</span>
@@ -721,22 +717,30 @@ function RequestManagement() {
           <p className="text-3xl font-bold text-blue-800">{stats.in_progress}</p>
           <p className="text-xs text-blue-600 mt-1">in_progress</p>
         </div>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-green-700 text-sm font-semibold">已完成</span>
+            <CheckCircle className="w-5 h-5 text-green-600" />
+          </div>
+          <p className="text-3xl font-bold text-green-800">{stats.completed}</p>
+          <p className="text-xs text-green-600 mt-1">completed</p>
+        </div>
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-700 text-sm font-semibold">已完成</span>
-            <CheckCircle className="w-5 h-5 text-gray-600" />
+            <span className="text-gray-700 text-sm font-semibold">已取消</span>
+            <XCircle className="w-5 h-5 text-gray-600" />
           </div>
-          <p className="text-3xl font-bold text-gray-800">{stats.completed}</p>
-          <p className="text-xs text-gray-600 mt-1">completed</p>
+          <p className="text-3xl font-bold text-gray-800">{stats.cancelled}</p>
+          <p className="text-xs text-gray-600 mt-1">cancelled</p>
         </div>
       </div>
 
       <div className="flex space-x-2 overflow-x-auto pb-2">
         <FilterButton label="全部" active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} count={requests.length} />
         <FilterButton label="待支援" active={filterStatus === 'pending'} onClick={() => setFilterStatus('pending')} count={stats.pending} color="orange" />
-        <FilterButton label="派單中" active={filterStatus === 'assigning'} onClick={() => setFilterStatus('assigning')} count={stats.assigning} color="yellow" />
         <FilterButton label="進行中" active={filterStatus === 'in_progress'} onClick={() => setFilterStatus('in_progress')} count={stats.in_progress} color="blue" />
-        <FilterButton label="已完成" active={filterStatus === 'completed'} onClick={() => setFilterStatus('completed')} count={stats.completed} color="gray" />
+        <FilterButton label="已完成" active={filterStatus === 'completed'} onClick={() => setFilterStatus('completed')} count={stats.completed} color="green" />
+        <FilterButton label="已取消" active={filterStatus === 'cancelled'} onClick={() => setFilterStatus('cancelled')} count={stats.cancelled} color="gray" />
       </div>
 
       {showForm && (
@@ -848,6 +852,7 @@ function FilterButton({ label, active, onClick, count, color = 'red' }) {
     orange: 'from-orange-600 to-orange-700',
     yellow: 'from-yellow-600 to-yellow-700',
     blue: 'from-blue-600 to-blue-700',
+    green: 'from-green-600 to-green-700',
     gray: 'from-gray-600 to-gray-700'
   };
 
@@ -1155,7 +1160,6 @@ function AssignmentManagement() {
         request_id: selectedRequest,
         status: 'pending',
         assigned_at: new Date().toISOString(),
-        // 清除之前的拒絕/取消記錄
         rejected_at: null,
         rejection_reason: null,
         cancelled_at: null,
@@ -1176,11 +1180,11 @@ function AssignmentManagement() {
       await updateRequestStatus({
         variables: {
           id: selectedRequest,
-          status: 'assigning'
+          status: 'in_progress'
         }
       });
 
-      alert(`✅ 派單成功！\n• 已派單給 ${selectedVolunteers.length} 位志工（共 ${totalSelectedPeople} 人）\n• 志工狀態: available → assigning\n• 需求狀態: pending → assigning`);
+      alert(`✅ 派單成功！\n• 已派單給 ${selectedVolunteers.length} 位志工（共 ${totalSelectedPeople} 人）\n• 志工狀態: available → assigning\n• 需求狀態: pending → in_progress`);
       
       setSelectedVolunteers([]);
       setSelectedRequest(null);

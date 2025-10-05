@@ -469,7 +469,7 @@ function PendingAssignment({ assignment, volunteer, setVolunteer }) {
   // V1: 志工確認派單
   const [confirmAssignment, { loading: confirming }] = useMutation(CONFIRM_ASSIGNMENT, {
     onCompleted: () => {
-      alert('✅ 任務已接受！\n• 您的狀態已更新為「執行中」(assigned)\n• 需求狀態已更新為「進行中」(in_progress)');
+      alert('✅ 任務已接受！\n• 您的狀態已更新為「執行中」(assigned)\n• 開始執行任務');
       setVolunteer({ ...volunteer, status: 'assigned' });
     },
     onError: (error) => {
@@ -482,7 +482,7 @@ function PendingAssignment({ assignment, volunteer, setVolunteer }) {
   // V2: 志工拒絕派單
   const [rejectAssignment, { loading: rejecting }] = useMutation(REJECT_ASSIGNMENT, {
     onCompleted: () => {
-      alert('❌ 任務已拒絕\n• 您的狀態恢復為「已上線」(available)\n• 需求狀態恢復為「待支援」(pending)');
+      alert('❌ 任務已拒絕\n• 您的狀態恢復為「已上線」(available)\n• 可繼續接收新派單');
       setVolunteer({ ...volunteer, status: 'available' });
     },
     onError: (error) => {
