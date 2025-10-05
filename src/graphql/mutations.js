@@ -130,6 +130,7 @@ export const VOLUNTEER_GO_OFFLINE = gql`
 export const CREATE_REQUEST = gql`
   mutation CreateRequest(
     $request_type: String!
+    $township: String
     $village: String!
     $street: String!
     $contact_name: String!
@@ -144,6 +145,7 @@ export const CREATE_REQUEST = gql`
     insert_disaster_requests_one(
       object: {
         request_type: $request_type
+        township: $township
         village: $village
         street: $street
         contact_name: $contact_name
@@ -161,6 +163,12 @@ export const CREATE_REQUEST = gql`
       description
       status
       created_by
+      request_type
+      township
+      village
+      street
+      address_detail
+      priority
     }
   }
 `;
@@ -170,30 +178,46 @@ export const UPDATE_REQUEST = gql`
   mutation UpdateRequest(
     $id: uuid!
     $request_type: String
+    $township: String
     $village: String
     $street: String
+    $address_detail: String
     $contact_name: String
     $contact_phone: String
     $description: String
     $required_volunteers: Int
     $priority: String
+    $notes: String
   ) {
     update_disaster_requests_by_pk(
       pk_columns: { id: $id }
       _set: {
         request_type: $request_type
+        township: $township
         village: $village
         street: $street
+        address_detail: $address_detail
         contact_name: $contact_name
         contact_phone: $contact_phone
         description: $description
         required_volunteers: $required_volunteers
         priority: $priority
+        notes: $notes
       }
     ) {
       id
       description
       status
+      request_type
+      priority
+      township
+      village
+      street
+      address_detail
+      contact_name
+      contact_phone
+      required_volunteers
+      notes
     }
   }
 `;

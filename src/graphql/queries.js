@@ -69,11 +69,13 @@ export const GET_VOLUNTEERS = gql`
       id
       name
       phone
+      email
       member_count
       nickname
       status
       notes
       created_at
+      updated_at
     }
   }
 `;
