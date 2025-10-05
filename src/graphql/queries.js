@@ -336,3 +336,169 @@ export const GET_VOLUNTEER_NOTIFICATIONS = gql`
     }
   }
 `;
+
+
+// ========== 派單管理專用查詢 ==========
+
+// 取得需求的派單統計（包含已派遣人數）
+export const GET_REQUEST_WITH_ASSIGNMENTS = gql`
+  query GetRequestWithAssignments($request_id: uuid!) {
+    disaster_requests_by_pk(id: $request_id) {
+      id
+      description
+      village
+      street
+      contact_name
+      contact_phone
+      priority
+      request_type
+      required_volunteers
+      status
+      created_at
+      
+      # 使用計算欄位獲取已派遣總人數（需要在 Hasura 中設定）
+      # assigned_volunteers_total
+      # confirmed_volunteers_total
+      
+      # 獲取所有派單記錄
+      assignments(
+        order_by: { assigned_at: desc }
+        where: { status: { _in: ["pending", "confirmed"] } }
+      ) {
+        id
+        status
+        assigned_at
+        volunteer {
+          id
+          name
+          phone
+          member_count
+          status
+        }
+      }
+      
+      # 手動計算已派遣人數（暫時方案）
+      assignments_aggregate(
+        where: { status: { _in: ["pending", "confirmed"] } }
+      ) {
+        aggregate {
+          sum {
+            volunteer {
+              member_count
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+// 取得所有待支援需求（含人數統計）
+export const GET_PENDING_REQUESTS_WITH_STATS = gql`
+  query GetPendingRequestsWithStats {
+    disaster_requests(
+      where: { status: { _in: ["pending", "assigning"] } }
+      order_by: { priority: asc, created_at: desc }
+    ) {
+      id
+      request_type
+      priority
+      village
+      street
+      contact_name
+      contact_phone
+      description
+      required_volunteers
+      status
+      created_at
+      
+      # 派單統計
+      assignments_aggregate(
+        where: { status: { _in: ["pending", "confirmed"] } }
+      ) {
+        aggregate {
+          count
+        }
+      }
+      
+      # 當前派單列表
+      assignments(
+        where: { status: { _in: ["pending", "confirmed"] } }
+        order_by: { assigned_at: desc }
+      ) {
+        id
+        status
+        volunteer {
+          id
+          name
+          member_count
+        }
+      }
+    }
+  }
+`;
+
+// 批次派單 mutation
+export const BATCH_ASSIGN_VOLUNTEERS = gql`
+  mutation BatchAssignVolunteers(
+    $assignments: [assignments_insert_input!]!
+  ) {
+    insert_assignments(
+      objects: $assignments
+    ) {
+      affected_rows
+      returning {
+        id
+        volunteer_id
+        request_id
+        status
+        assigned_at
+        volunteer {
+          id
+          name
+          member_count
+        }
+        disaster_request {
+          id
+          description
+        }
+      }
+    }
+  }
+`;
+
+// 批次更新志工狀態
+export const BATCH_UPDATE_VOLUNTEER_STATUS = gql`
+  mutation BatchUpdateVolunteerStatus(
+    $volunteer_ids: [uuid!]!
+    $status: String!
+  ) {
+    update_volunteers(
+      where: { id: { _in: $volunteer_ids } }
+      _set: { status: $status }
+    ) {
+      affected_rows
+      returning {
+        id
+        name
+        status
+      }
+    }
+  }
+`;
+
+// 更新需求狀態（當派單時）
+export const UPDATE_REQUEST_STATUS = gql`
+  mutation UpdateRequestStatus(
+    $request_id: uuid!
+    $status: String!
+  ) {
+    update_disaster_requests_by_pk(
+      pk_columns: { id: $request_id }
+      _set: { status: $status }
+    ) {
+      id
+      status
+    }
+  }
+`;

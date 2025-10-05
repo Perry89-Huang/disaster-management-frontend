@@ -23,6 +23,49 @@ import {
   CANCEL_ASSIGNMENT
 } from '../graphql/mutations';
 
+// 定義待支援需求查詢（含人數統計）
+const GET_PENDING_REQUESTS_WITH_STATS = gql`
+  query GetPendingRequestsWithStats {
+    disaster_requests(
+      where: { status: { _in: ["pending", "assigning"] } }
+      order_by: { priority: asc, created_at: desc }
+    ) {
+      id
+      request_type
+      priority
+      village
+      street
+      contact_name
+      contact_phone
+      description
+      required_volunteers
+      status
+      created_at
+      
+      assignments_aggregate(
+        where: { status: { _in: ["pending", "confirmed"] } }
+      ) {
+        aggregate {
+          count
+        }
+      }
+      
+      assignments(
+        where: { status: { _in: ["pending", "confirmed"] } }
+        order_by: { assigned_at: desc }
+      ) {
+        id
+        status
+        volunteer {
+          id
+          name
+          member_count
+        }
+      }
+    }
+  }
+`;
+
 export default function AdminApp() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const user = { role: 'admin', id: '1', name: '管理員' };
@@ -147,7 +190,6 @@ function Dashboard() {
         ))}
       </div>
 
-      {/* 狀態流程說明 */}
       <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
         <div className="flex items-center mb-4">
           <div className="bg-gradient-to-br from-blue-400 to-blue-600 p-3 rounded-xl text-white mr-3">
@@ -157,7 +199,6 @@ function Dashboard() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* 志工狀態流程 */}
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
             <h3 className="font-bold text-blue-800 mb-3">志工狀態流程</h3>
             <div className="space-y-2 text-sm">
@@ -183,7 +224,6 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* 需求狀態流程 */}
           <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
             <h3 className="font-bold text-orange-800 mb-3">需求狀態流程</h3>
             <div className="space-y-2 text-sm">
@@ -206,7 +246,6 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* 派單狀態流程 */}
           <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
             <h3 className="font-bold text-purple-800 mb-3">派單狀態流程</h3>
             <div className="space-y-2 text-sm">
@@ -235,7 +274,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 系統資訊 */}
       <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
         <div className="flex items-center mb-4">
           <div className="bg-gradient-to-br from-green-400 to-green-600 p-3 rounded-xl text-white mr-3">
@@ -353,13 +391,19 @@ function VolunteerManagement() {
           <h2 className="text-3xl font-bold text-gray-800 mb-2">志工管理</h2>
           <p className="text-gray-600">管理救災志工資訊與狀態</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="flex items-center space-x-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 py-3 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 w-full sm:w-auto justify-center font-medium">
+        <button onClick={() => { setShowForm(true); setEditingVolunteer(null); }} className="flex items-center space-x-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 py-3 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 w-full sm:w-auto justify-center font-medium">
           <UserPlus className="w-5 h-5" />
           <span>新增志工</span>
         </button>
       </div>
 
-      {showForm && <VolunteerForm onClose={() => setShowForm(false)} />}
+      {showForm && (
+        <VolunteerForm 
+          volunteer={editingVolunteer}
+          onClose={() => { setShowForm(false); setEditingVolunteer(null); }}
+          onSave={handleSave}
+        />
+      )}
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
         <div className="overflow-x-auto">
@@ -396,10 +440,10 @@ function VolunteerManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
-                    <button className="text-blue-600 hover:text-blue-800 inline-flex items-center font-medium transition">
+                    <button onClick={() => handleEdit(vol)} className="text-blue-600 hover:text-blue-800 inline-flex items-center font-medium transition">
                       <Edit className="w-4 h-4 mr-1" />編輯
                     </button>
-                    <button className="text-red-600 hover:text-red-800 inline-flex items-center font-medium transition">
+                    <button onClick={() => handleDelete(vol.id)} className="text-red-600 hover:text-red-800 inline-flex items-center font-medium transition">
                       <Trash2 className="w-4 h-4 mr-1" />刪除
                     </button>
                   </td>
@@ -526,12 +570,10 @@ function RequestManagement() {
   const [editingRequest, setEditingRequest] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
 
-  // 查詢所有需求
   const { loading, error, data } = useQuery(GET_REQUESTS, {
     pollInterval: 5000
   });
 
-  // Mutations
   const [createRequest] = useMutation(CREATE_REQUEST, {
     refetchQueries: [{ query: GET_REQUESTS }, { query: GET_DASHBOARD_STATS }]
   });
@@ -584,7 +626,6 @@ function RequestManagement() {
   const handleSave = async (formData) => {
     try {
       if (editingRequest) {
-        // 更新需求
         await updateRequest({
           variables: {
             id: editingRequest.id,
@@ -593,7 +634,6 @@ function RequestManagement() {
         });
         alert('更新成功！');
       } else {
-        // 新增需求 (A3 操作)
         await createRequest({
           variables: {
             ...formData,
@@ -642,7 +682,6 @@ function RequestManagement() {
 
   return (
     <div className="space-y-6">
-      {/* 標題與按鈕 */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-gray-800 mb-2">需求管理</h2>
@@ -657,7 +696,6 @@ function RequestManagement() {
         </button>
       </div>
 
-      {/* 統計卡片 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
@@ -693,7 +731,6 @@ function RequestManagement() {
         </div>
       </div>
 
-      {/* 篩選按鈕 */}
       <div className="flex space-x-2 overflow-x-auto pb-2">
         <FilterButton label="全部" active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} count={requests.length} />
         <FilterButton label="待支援" active={filterStatus === 'pending'} onClick={() => setFilterStatus('pending')} count={stats.pending} color="orange" />
@@ -702,7 +739,6 @@ function RequestManagement() {
         <FilterButton label="已完成" active={filterStatus === 'completed'} onClick={() => setFilterStatus('completed')} count={stats.completed} color="gray" />
       </div>
 
-      {/* 表單 */}
       {showForm && (
         <RequestForm 
           request={editingRequest}
@@ -711,7 +747,6 @@ function RequestManagement() {
         />
       )}
 
-      {/* 需求列表 */}
       <div className="grid grid-cols-1 gap-6">
         {filteredRequests.length === 0 ? (
           <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-100">
@@ -727,7 +762,6 @@ function RequestManagement() {
         ) : (
           filteredRequests.map((req) => (
             <div key={req.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border border-gray-100">
-              {/* 頂部標籤與操作 */}
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
                 <div className="flex-1 w-full">
                   <div className="flex items-center space-x-2 mb-3 flex-wrap gap-2">
@@ -764,7 +798,6 @@ function RequestManagement() {
                 </div>
               </div>
 
-              {/* 需求詳細資訊 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
                 <div className="flex items-start space-x-2">
                   <MapPin className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -1015,77 +1048,380 @@ function AssignmentManagement() {
   const [selectedVolunteers, setSelectedVolunteers] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  const availableVolunteers = mockVolunteers.filter(v => v.status === 'available');
-  const pendingRequests = mockRequests.filter(r => r.status === 'pending');
+  const { loading: loadingRequests, data: requestsData } = useQuery(GET_PENDING_REQUESTS_WITH_STATS, {
+    pollInterval: 5000
+  });
 
-  const handleAssign = () => {
-    if (selectedVolunteers.length === 0 || !selectedRequest) {
+  const { loading: loadingVolunteers, data: volunteersData } = useQuery(GET_AVAILABLE_VOLUNTEERS, {
+    pollInterval: 5000
+  });
+
+  const { loading: loadingAssignments, data: assignmentsData } = useQuery(GET_ASSIGNMENTS, {
+    pollInterval: 5000
+  });
+
+  const [batchAssign] = useMutation(gql`
+    mutation BatchAssign($assignments: [assignments_insert_input!]!) {
+      insert_assignments(objects: $assignments) {
+        affected_rows
+        returning {
+          id
+          volunteer_id
+          request_id
+        }
+      }
+    }
+  `, {
+    refetchQueries: [
+      { query: GET_PENDING_REQUESTS_WITH_STATS },
+      { query: GET_AVAILABLE_VOLUNTEERS },
+      { query: GET_ASSIGNMENTS },
+      { query: GET_DASHBOARD_STATS }
+    ]
+  });
+
+  const [updateVolunteerStatus] = useMutation(gql`
+    mutation UpdateVolunteerStatus($ids: [uuid!]!, $status: String!) {
+      update_volunteers(
+        where: { id: { _in: $ids } }
+        _set: { status: $status }
+      ) {
+        affected_rows
+      }
+    }
+  `);
+
+  const [updateRequestStatus] = useMutation(gql`
+    mutation UpdateRequestStatus($id: uuid!, $status: String!) {
+      update_disaster_requests_by_pk(
+        pk_columns: { id: $id }
+        _set: { status: $status }
+      ) {
+        id
+      }
+    }
+  `);
+
+  const [cancelAssignment] = useMutation(CANCEL_ASSIGNMENT, {
+    refetchQueries: [
+      { query: GET_ASSIGNMENTS },
+      { query: GET_PENDING_REQUESTS_WITH_STATS },
+      { query: GET_AVAILABLE_VOLUNTEERS },
+      { query: GET_DASHBOARD_STATS }
+    ]
+  });
+
+  const availableVolunteers = volunteersData?.volunteers || [];
+  const pendingRequests = requestsData?.disaster_requests || [];
+  const activeAssignments = assignmentsData?.assignments || [];
+
+  const selectedVolunteersData = availableVolunteers.filter(v => selectedVolunteers.includes(v.id));
+  const totalSelectedPeople = selectedVolunteersData.reduce((sum, v) => sum + v.member_count, 0);
+
+  const selectedRequestData = pendingRequests.find(r => r.id === selectedRequest);
+  const requiredPeople = selectedRequestData?.required_volunteers || 0;
+  
+  const assignedPeople = selectedRequestData?.assignments?.reduce((sum, a) => {
+    return sum + (a.volunteer?.member_count || 0);
+  }, 0) || 0;
+  
+  const remainingPeople = Math.max(0, requiredPeople - assignedPeople);
+  const canAssign = selectedVolunteers.length > 0 && selectedRequest && totalSelectedPeople > 0;
+
+  const toggleVolunteer = (volunteerId) => {
+    setSelectedVolunteers(prev => 
+      prev.includes(volunteerId)
+        ? prev.filter(id => id !== volunteerId)
+        : [...prev, volunteerId]
+    );
+  };
+
+  const handleBatchAssign = async () => {
+    if (!canAssign) {
       alert('請選擇志工和需求');
       return;
     }
-    alert(`A1: 管理員派單\n• 派單給 ${selectedVolunteers.length} 位志工\n• 志工狀態: available → assigning\n• 需求狀態: pending → assigning\n• 派單狀態: pending`);
+
+    try {
+      const assignmentObjects = selectedVolunteers.map(volunteerId => ({
+        volunteer_id: volunteerId,
+        request_id: selectedRequest,
+        status: 'pending'
+      }));
+
+      await batchAssign({
+        variables: { assignments: assignmentObjects }
+      });
+
+      await updateVolunteerStatus({
+        variables: {
+          ids: selectedVolunteers,
+          status: 'assigning'
+        }
+      });
+
+      await updateRequestStatus({
+        variables: {
+          id: selectedRequest,
+          status: 'assigning'
+        }
+      });
+
+      alert(`✅ 派單成功！\n• 已派單給 ${selectedVolunteers.length} 位志工（共 ${totalSelectedPeople} 人）\n• 志工狀態: available → assigning\n• 需求狀態: pending → assigning`);
+      
+      setSelectedVolunteers([]);
+      setSelectedRequest(null);
+    } catch (error) {
+      console.error('派單失敗:', error);
+      alert('派單失敗: ' + error.message);
+    }
   };
+
+  const handleCancelAssignment = async (assignment) => {
+    if (!confirm('確定要取消此派單嗎？')) return;
+
+    const reason = prompt('請輸入取消原因（選填）：');
+    
+    try {
+      await cancelAssignment({
+        variables: {
+          assignment_id: assignment.id,
+          volunteer_id: assignment.volunteer.id,
+          request_id: assignment.disaster_request.id,
+          cancellation_reason: reason || ''
+        }
+      });
+      alert('派單已取消');
+    } catch (error) {
+      console.error('取消失敗:', error);
+      alert('取消失敗: ' + error.message);
+    }
+  };
+
+  if (loadingRequests || loadingVolunteers || loadingAssignments) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">載入中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-gray-800 mb-2">派單管理（A1）</h2>
-        <p className="text-gray-600">將待支援需求派單給已上線的志工</p>
+        <p className="text-gray-600">將待支援需求派單給已上線的志工，可同時選擇多位志工</p>
       </div>
+
+      {selectedRequestData && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-gray-800 mb-2">已選擇需求</h3>
+              <p className="text-sm text-gray-700 mb-2">{selectedRequestData.description}</p>
+              <p className="text-sm text-gray-600">📍 {selectedRequestData.village} {selectedRequestData.street}</p>
+            </div>
+            <button 
+              onClick={() => setSelectedRequest(null)}
+              className="text-gray-400 hover:text-gray-600 p-2"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-600 mb-1">需要人數</p>
+              <p className="text-2xl font-bold text-blue-600">{requiredPeople}</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-600 mb-1">已派遣</p>
+              <p className="text-2xl font-bold text-green-600">{assignedPeople}</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-600 mb-1">還需要</p>
+              <p className="text-2xl font-bold text-orange-600">{remainingPeople}</p>
+            </div>
+          </div>
+
+          {selectedRequestData.assignments && selectedRequestData.assignments.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-blue-200">
+              <p className="text-sm font-semibold text-gray-700 mb-2">已派遣志工：</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedRequestData.assignments.map(a => (
+                  <span key={a.id} className="inline-flex items-center px-3 py-1 bg-white rounded-full text-sm">
+                    <span className="font-medium">{a.volunteer.name}</span>
+                    <span className="ml-2 text-gray-500">({a.volunteer.member_count}人)</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-bold ${
+                      a.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                    }`}>
+                      {a.status === 'pending' ? '待確認' : '已確認'}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-800">已上線志工 (available)</h3>
-            <span className="bg-green-100 text-green-600 px-4 py-2 rounded-full text-sm font-bold">{availableVolunteers.length} 位</span>
+            <h3 className="text-xl font-bold text-gray-800">待支援需求</h3>
+            <span className="bg-red-100 text-red-600 px-4 py-2 rounded-full text-sm font-bold">
+              {pendingRequests.length} 件
+            </span>
           </div>
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {availableVolunteers.map(vol => (
-              <div key={vol.id} onClick={() => setSelectedVolunteers([vol.id])} className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedVolunteers.includes(vol.id) ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-gray-800">{vol.name}</p>
-                    <p className="text-sm text-gray-600">{vol.phone}</p>
-                  </div>
-                  {selectedVolunteers.includes(vol.id) && <CheckCircle className="w-6 h-6 text-red-600" />}
-                </div>
+            {pendingRequests.length === 0 ? (
+              <div className="text-center py-12">
+                <AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">目前沒有待支援需求</p>
               </div>
-            ))}
+            ) : (
+              pendingRequests.map(req => {
+                const needPeople = req.required_volunteers || 0;
+                const hasPeople = req.assignments?.reduce((sum, a) => {
+                  return sum + (a.volunteer?.member_count || 0);
+                }, 0) || 0;
+                const isSelected = selectedRequest === req.id;
+                const isFulfilled = needPeople > 0 && hasPeople >= needPeople;
+                
+                return (
+                  <div 
+                    key={req.id} 
+                    onClick={() => setSelectedRequest(req.id)}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      isSelected 
+                        ? 'border-blue-500 bg-blue-50 shadow-md' 
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            req.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                            req.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {req.priority === 'urgent' ? '緊急' : req.priority === 'high' ? '高' : '普通'}
+                          </span>
+                          {needPeople > 0 && (
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${
+                              isFulfilled ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                            }`}>
+                              {hasPeople}/{needPeople} 人
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-bold text-gray-800 mb-1">{req.description}</p>
+                        <p className="text-xs text-gray-600">📍 {req.village} {req.street}</p>
+                      </div>
+                      {isSelected && <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0" />}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-800">待支援需求 (pending)</h3>
-            <span className="bg-red-100 text-red-600 px-4 py-2 rounded-full text-sm font-bold">{pendingRequests.length} 件</span>
+            <div>
+              <h3 className="text-xl font-bold text-gray-800">已上線志工</h3>
+              {selectedVolunteers.length > 0 && (
+                <p className="text-sm text-blue-600 mt-1">
+                  已選 {selectedVolunteers.length} 位（共 {totalSelectedPeople} 人）
+                </p>
+              )}
+            </div>
+            <span className="bg-green-100 text-green-600 px-4 py-2 rounded-full text-sm font-bold">
+              {availableVolunteers.length} 位
+            </span>
           </div>
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {pendingRequests.map(req => (
-              <div key={req.id} onClick={() => setSelectedRequest(req.id)} className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRequest === req.id ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-gray-800">{req.description}</p>
-                    <p className="text-sm text-gray-600">📍 {req.village} {req.street}</p>
-                  </div>
-                  {selectedRequest === req.id && <CheckCircle className="w-6 h-6 text-red-600" />}
-                </div>
+            {availableVolunteers.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">目前沒有已上線志工</p>
               </div>
-            ))}
+            ) : (
+              availableVolunteers.map(vol => {
+                const isSelected = selectedVolunteers.includes(vol.id);
+                
+                return (
+                  <div 
+                    key={vol.id} 
+                    onClick={() => toggleVolunteer(vol.id)}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      isSelected 
+                        ? 'border-green-500 bg-green-50 shadow-md' 
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
+                          isSelected ? 'bg-green-600' : 'bg-gray-400'
+                        }`}>
+                          {vol.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-800">{vol.name}</p>
+                          <p className="text-sm text-gray-600">{vol.phone}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
+                          {vol.member_count} 人
+                        </span>
+                        {isSelected && <CheckCircle className="w-6 h-6 text-green-600" />}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
 
-      {selectedVolunteers.length > 0 && selectedRequest && (
+      {canAssign && (
         <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl shadow-2xl p-6 text-white">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <p className="text-sm text-red-100 mb-1">準備派單（A1）</p>
-              <p className="text-2xl font-bold">{selectedVolunteers.length} 位志工 → 1 件需求</p>
-              <p className="text-sm text-red-100 mt-2">
-                志工狀態: available → assigning | 需求狀態: pending → assigning
+              <p className="text-2xl font-bold mb-2">
+                {selectedVolunteers.length} 位志工（共 {totalSelectedPeople} 人）→ 1 件需求
               </p>
+              {requiredPeople > 0 && (
+                <div className="flex items-center space-x-4 text-sm">
+                  <span className="text-red-100">
+                    需要: {requiredPeople} 人
+                  </span>
+                  <span className="text-red-100">
+                    已派: {assignedPeople} 人
+                  </span>
+                  <span className={`font-bold ${
+                    (assignedPeople + totalSelectedPeople) >= requiredPeople 
+                      ? 'text-green-300' 
+                      : 'text-yellow-300'
+                  }`}>
+                    派單後: {assignedPeople + totalSelectedPeople} 人
+                  </span>
+                </div>
+              )}
             </div>
-            <button onClick={handleAssign} className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-white text-red-600 px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg">
+            <button 
+              onClick={handleBatchAssign}
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-white text-red-600 px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-bold text-lg"
+            >
               <Send className="w-6 h-6" />
               <span>確認派單</span>
             </button>
@@ -1093,7 +1429,6 @@ function AssignmentManagement() {
         </div>
       )}
 
-      {/* 進行中的派單 */}
       <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
         <h3 className="text-xl font-bold text-gray-800 mb-4">派單記錄</h3>
         <div className="space-y-3">
@@ -1105,30 +1440,29 @@ function AssignmentManagement() {
           ) : (
             activeAssignments.map(assignment => {
               const statusConfig = {
-                pending: { label: '待確認', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', detail: 'pending (等待志工確認)' },
-                confirmed: { label: '已確認', color: 'bg-green-100 text-green-800 border-green-300', detail: 'confirmed (志工已接受)' },
-                rejected: { label: '已拒絕', color: 'bg-red-100 text-red-800 border-red-300', detail: 'rejected (志工已拒絕)' },
-                cancelled: { label: '已取消', color: 'bg-gray-100 text-gray-800 border-gray-300', detail: 'cancelled (管理員已取消)' },
-                completed: { label: '已完成', color: 'bg-blue-100 text-blue-800 border-blue-300', detail: 'completed (任務已完成)' }
+                pending: { label: '待確認', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+                confirmed: { label: '已確認', color: 'bg-green-100 text-green-800 border-green-300' },
+                rejected: { label: '已拒絕', color: 'bg-red-100 text-red-800 border-red-300' },
+                cancelled: { label: '已取消', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+                completed: { label: '已完成', color: 'bg-blue-100 text-blue-800 border-blue-300' }
               };
 
               const currentStatus = statusConfig[assignment.status] || statusConfig.pending;
 
               return (
-                <div key={assignment.id} className="p-5 border-2 border-gray-200 rounded-xl hover:shadow-lg transition-all bg-gradient-to-r from-white to-gray-50">
+                <div key={assignment.id} className="p-5 border-2 border-gray-200 rounded-xl hover:shadow-lg transition-all">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-3 flex-wrap gap-2">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold border-2 ${currentStatus.color}`}>
                           {currentStatus.label}
                         </span>
-                        <span className="text-xs text-gray-500">{currentStatus.detail}</span>
                       </div>
                       <p className="text-sm mb-2">
                         <span className="font-semibold text-gray-700">志工：</span>
                         <span className="text-gray-900">{assignment.volunteer?.name}</span>
-                        <span className="ml-2 text-xs text-gray-500">
-                          ({assignment.volunteer?.phone})
+                        <span className="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">
+                          {assignment.volunteer?.member_count} 人
                         </span>
                       </p>
                       <p className="text-sm mb-2">
