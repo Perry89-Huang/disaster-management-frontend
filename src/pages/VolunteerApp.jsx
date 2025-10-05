@@ -1,38 +1,23 @@
 import React, { useState } from 'react';
+import { useQuery, useMutation, useLazyQuery } from '@apollo/client';
 import { Bell, MapPin, Phone, Clock, CheckCircle, AlertCircle, User, LogOut, Home, Mail, Users, ArrowRight, Power, XCircle, Check, X } from 'lucide-react';
-
-// 模擬志工資料
-const mockVolunteer = {
-  id: '1',
-  name: '王小明',
-  phone: '0912-345-678',
-  email: 'wang@example.com',
-  member_count: 2,
-  status: 'off' // off, available, assigning, assigned
-};
-
-// 模擬派單資料
-const mockAssignments = [
-  {
-    id: '1',
-    status: 'pending',
-    assigned_at: new Date().toISOString(),
-    disaster_request: {
-      id: 'r1',
-      description: '需要協助清理淤泥，約一層樓高',
-      village: '東富村',
-      street: '佛祖街15號',
-      contact_name: '林大哥',
-      contact_phone: '0988-039601',
-      priority: 'urgent',
-      request_type: '志工'
-    }
-  }
-];
+import {
+  VOLUNTEER_GO_ONLINE,
+  VOLUNTEER_GO_OFFLINE,
+  CONFIRM_ASSIGNMENT,
+  REJECT_ASSIGNMENT,
+  COMPLETE_ASSIGNMENT,
+  REGISTER_VOLUNTEER
+} from '../graphql/mutations';
+import { 
+  GET_VOLUNTEER_ASSIGNMENTS,
+  VERIFY_VOLUNTEER,
+  GET_VOLUNTEER_PROFILE
+} from '../graphql/queries';
 
 // 主應用程式元件
 export default function VolunteerApp() {
-  const [volunteer, setVolunteer] = useState(mockVolunteer);
+  const [volunteer, setVolunteer] = useState(null);
   const [currentPage, setCurrentPage] = useState('home');
 
   const handleLogout = () => {
@@ -61,7 +46,7 @@ export default function VolunteerApp() {
           <div className="flex items-center space-x-3">
             <button className="relative hover:bg-white/20 p-2 rounded-lg transition">
               <Bell className="w-6 h-6" />
-              <span className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">2</span>
+              <span className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">0</span>
             </button>
             <button onClick={handleLogout} className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg transition backdrop-blur-sm">
               <LogOut className="w-4 h-4" />
@@ -100,13 +85,61 @@ function AuthScreen({ onLogin }) {
     member_count: 1
   });
 
+  // 驗證志工登入 - 改用 useLazyQuery
+  const [verifyVolunteer, { loading: verifying }] = useLazyQuery(
+    VERIFY_VOLUNTEER,
+    {
+      onCompleted: (data) => {
+        if (data.volunteers && data.volunteers.length > 0) {
+          const volunteerData = data.volunteers[0];
+          onLogin(volunteerData);
+          alert(`✅ 登入成功！\n歡迎回來，${volunteerData.name}`);
+        } else {
+          alert('❌ 登入失敗\n找不到此志工資料，請確認手機號碼和姓名是否正確');
+        }
+      },
+      onError: (error) => {
+        console.error('登入錯誤:', error);
+        alert('登入失敗: ' + error.message);
+      }
+    }
+  );
+
+  // 註冊新志工
+  const [registerVolunteer, { loading: registering }] = useMutation(
+    REGISTER_VOLUNTEER,
+    {
+      onCompleted: (data) => {
+        if (data.insert_volunteers_one) {
+          alert('✅ 註冊成功！\n請使用手機號碼和姓名登入');
+          setMode('login');
+          // 自動填入登入資料
+          setFormData({
+            ...formData,
+            email: '',
+            member_count: 1
+          });
+        }
+      },
+      onError: (error) => {
+        console.error('註冊錯誤:', error);
+        alert('註冊失敗: ' + error.message);
+      }
+    }
+  );
+
   const handleLogin = () => {
     if (!formData.phone || !formData.name) {
       alert('請填寫手機號碼和姓名');
       return;
     }
-    // 模擬登入
-    onLogin({ ...mockVolunteer, name: formData.name, phone: formData.phone });
+
+    verifyVolunteer({
+      variables: {
+        phone: formData.phone,
+        name: formData.name
+      }
+    });
   };
 
   const handleRegister = () => {
@@ -114,8 +147,15 @@ function AuthScreen({ onLogin }) {
       alert('請填寫必填欄位（姓名和手機號碼）');
       return;
     }
-    alert('註冊成功！請使用手機號碼和姓名登入');
-    setMode('login');
+
+    registerVolunteer({
+      variables: {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email || null,
+        member_count: formData.member_count
+      }
+    });
   };
 
   return (
@@ -131,10 +171,18 @@ function AuthScreen({ onLogin }) {
 
         <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
           <div className="flex mb-6 bg-gray-100 rounded-xl p-1">
-            <button onClick={() => setMode('login')} className={`flex-1 py-3 rounded-lg font-semibold transition-all ${mode === 'login' ? 'bg-white text-red-600 shadow-md' : 'text-gray-600'}`}>
+            <button 
+              onClick={() => setMode('login')} 
+              disabled={verifying || registering}
+              className={`flex-1 py-3 rounded-lg font-semibold transition-all ${mode === 'login' ? 'bg-white text-red-600 shadow-md' : 'text-gray-600'}`}
+            >
               志工登入
             </button>
-            <button onClick={() => setMode('register')} className={`flex-1 py-3 rounded-lg font-semibold transition-all ${mode === 'register' ? 'bg-white text-red-600 shadow-md' : 'text-gray-600'}`}>
+            <button 
+              onClick={() => setMode('register')} 
+              disabled={verifying || registering}
+              className={`flex-1 py-3 rounded-lg font-semibold transition-all ${mode === 'register' ? 'bg-white text-red-600 shadow-md' : 'text-gray-600'}`}
+            >
               志工註冊
             </button>
           </div>
@@ -145,17 +193,35 @@ function AuthScreen({ onLogin }) {
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                   <Phone className="w-4 h-4 mr-2 text-red-600" />手機號碼
                 </label>
-                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" placeholder="0912-345-678" />
+                <input 
+                  type="tel" 
+                  value={formData.phone} 
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" 
+                  placeholder="0912-345-678"
+                  disabled={verifying}
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                   <User className="w-4 h-4 mr-2 text-red-600" />姓名
                 </label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" placeholder="請輸入姓名" />
+                <input 
+                  type="text" 
+                  value={formData.name} 
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" 
+                  placeholder="請輸入姓名"
+                  disabled={verifying}
+                />
               </div>
-              <button onClick={handleLogin} className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center space-x-2">
-                <span>登入</span>
-                <ArrowRight className="w-5 h-5" />
+              <button 
+                onClick={handleLogin} 
+                disabled={verifying}
+                className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{verifying ? '登入中...' : '登入'}</span>
+                {!verifying && <ArrowRight className="w-5 h-5" />}
               </button>
             </div>
           )}
@@ -166,29 +232,61 @@ function AuthScreen({ onLogin }) {
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                   <User className="w-4 h-4 mr-2 text-red-600" />姓名 <span className="text-red-600 ml-1">*</span>
                 </label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" placeholder="請輸入姓名" />
+                <input 
+                  type="text" 
+                  value={formData.name} 
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" 
+                  placeholder="請輸入姓名"
+                  disabled={registering}
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                   <Phone className="w-4 h-4 mr-2 text-red-600" />手機號碼 <span className="text-red-600 ml-1">*</span>
                 </label>
-                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" placeholder="0912-345-678" />
+                <input 
+                  type="tel" 
+                  value={formData.phone} 
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" 
+                  placeholder="0912-345-678"
+                  disabled={registering}
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                   <Mail className="w-4 h-4 mr-2 text-gray-500" />Email（選填）
                 </label>
-                <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" placeholder="example@email.com" />
+                <input 
+                  type="email" 
+                  value={formData.email} 
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" 
+                  placeholder="example@email.com"
+                  disabled={registering}
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                   <Users className="w-4 h-4 mr-2 text-red-600" />可派遣人數
                 </label>
-                <input type="number" min="1" value={formData.member_count} onChange={(e) => setFormData({ ...formData, member_count: parseInt(e.target.value) || 1 })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition" />
+                <input 
+                  type="number" 
+                  min="1" 
+                  value={formData.member_count} 
+                  onChange={(e) => setFormData({ ...formData, member_count: parseInt(e.target.value) || 1 })} 
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
+                  disabled={registering}
+                />
               </div>
-              <button onClick={handleRegister} className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center space-x-2">
-                <span>完成註冊</span>
-                <ArrowRight className="w-5 h-5" />
+              <button 
+                onClick={handleRegister} 
+                disabled={registering}
+                className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{registering ? '註冊中...' : '完成註冊'}</span>
+                {!registering && <ArrowRight className="w-5 h-5" />}
               </button>
             </div>
           )}
@@ -218,19 +316,50 @@ function NavButton({ icon, label, active, onClick }) {
 
 // 首頁
 function HomePage({ volunteer, setVolunteer }) {
-  const assignments = mockAssignments;
+  // 查詢志工的派單
+  const { data: assignmentsData, loading: loadingAssignments } = useQuery(
+    GET_VOLUNTEER_ASSIGNMENTS,
+    {
+      variables: { volunteer_id: volunteer.id },
+      pollInterval: 5000
+    }
+  );
+
+  const assignments = assignmentsData?.assignments || [];
   const pendingCount = assignments.filter(a => a.status === 'pending').length;
   const confirmedCount = assignments.filter(a => a.status === 'confirmed').length;
   const completedCount = assignments.filter(a => a.status === 'completed').length;
 
-  // V4: 志工上線
+  // V4: 志工上線 - 使用 GraphQL mutation
+  const [goOnline, { loading: goingOnline }] = useMutation(VOLUNTEER_GO_ONLINE, {
+    onCompleted: (data) => {
+      setVolunteer({ ...volunteer, status: 'available' });
+      alert('✅ 已成功上線！\n現在可以接收派單通知');
+    },
+    onError: (error) => {
+      console.error('上線失敗:', error);
+      alert('上線失敗: ' + error.message);
+    }
+  });
+
+  // V5: 志工下線 - 使用 GraphQL mutation
+  const [goOffline, { loading: goingOffline }] = useMutation(VOLUNTEER_GO_OFFLINE, {
+    onCompleted: (data) => {
+      setVolunteer({ ...volunteer, status: 'off' });
+      alert('✅ 已下線\n您將不會收到新的派單');
+    },
+    onError: (error) => {
+      console.error('下線失敗:', error);
+      alert('下線失敗: ' + error.message);
+    }
+  });
+
   const handleGoOnline = () => {
-    setVolunteer({ ...volunteer, status: 'available' });
+    goOnline({ variables: { id: volunteer.id } });
   };
 
-  // V5: 志工下線
   const handleGoOffline = () => {
-    setVolunteer({ ...volunteer, status: 'off' });
+    goOffline({ variables: { id: volunteer.id } });
   };
 
   const statusConfig = {
@@ -263,15 +392,15 @@ function HomePage({ volunteer, setVolunteer }) {
               <p className="text-xl font-bold">{statusConfig[volunteer.status].label}</p>
             </div>
             {volunteer.status === 'off' && (
-              <button onClick={handleGoOnline} className="flex items-center space-x-2 bg-white text-red-600 px-5 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
+              <button onClick={handleGoOnline} disabled={goingOnline} className="flex items-center space-x-2 bg-white text-red-600 px-5 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                 <Power className="w-5 h-5" />
-                <span>上線接單</span>
+                <span>{goingOnline ? '上線中...' : '上線接單'}</span>
               </button>
             )}
             {volunteer.status === 'available' && (
-              <button onClick={handleGoOffline} className="flex items-center space-x-2 bg-white bg-opacity-30 text-white px-5 py-3 rounded-xl font-bold transition-all hover:bg-opacity-40">
+              <button onClick={handleGoOffline} disabled={goingOffline} className="flex items-center space-x-2 bg-white bg-opacity-30 text-white px-5 py-3 rounded-xl font-bold transition-all hover:bg-opacity-40 disabled:opacity-50 disabled:cursor-not-allowed">
                 <Power className="w-5 h-5" />
-                <span>下線</span>
+                <span>{goingOffline ? '下線中...' : '下線'}</span>
               </button>
             )}
             {(volunteer.status === 'assigning' || volunteer.status === 'assigned') && (
@@ -286,15 +415,15 @@ function HomePage({ volunteer, setVolunteer }) {
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
             <p className="text-red-100 text-xs mb-1">待確認</p>
-            <p className="text-2xl font-bold">{pendingCount}</p>
+            <p className="text-2xl font-bold">{loadingAssignments ? '...' : pendingCount}</p>
           </div>
           <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
             <p className="text-red-100 text-xs mb-1">進行中</p>
-            <p className="text-2xl font-bold">{confirmedCount}</p>
+            <p className="text-2xl font-bold">{loadingAssignments ? '...' : confirmedCount}</p>
           </div>
           <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
             <p className="text-red-100 text-xs mb-1">已完成</p>
-            <p className="text-2xl font-bold">{completedCount}</p>
+            <p className="text-2xl font-bold">{loadingAssignments ? '...' : completedCount}</p>
           </div>
         </div>
       </div>
@@ -338,16 +467,51 @@ function HomePage({ volunteer, setVolunteer }) {
 // 待確認派單卡片
 function PendingAssignment({ assignment, volunteer, setVolunteer }) {
   // V1: 志工確認派單
-  const handleAccept = () => {
-    alert('✅ 任務已接受！\n• 您的狀態已更新為「執行中」(assigned)\n• 需求狀態已更新為「進行中」(in_progress)');
-    setVolunteer({ ...volunteer, status: 'assigned' });
-  };
+  const [confirmAssignment, { loading: confirming }] = useMutation(CONFIRM_ASSIGNMENT, {
+    onCompleted: () => {
+      alert('✅ 任務已接受！\n• 您的狀態已更新為「執行中」(assigned)\n• 需求狀態已更新為「進行中」(in_progress)');
+      setVolunteer({ ...volunteer, status: 'assigned' });
+    },
+    onError: (error) => {
+      console.error('確認派單失敗:', error);
+      alert('確認派單失敗: ' + error.message);
+    },
+    refetchQueries: [{ query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } }]
+  });
 
   // V2: 志工拒絕派單
+  const [rejectAssignment, { loading: rejecting }] = useMutation(REJECT_ASSIGNMENT, {
+    onCompleted: () => {
+      alert('❌ 任務已拒絕\n• 您的狀態恢復為「已上線」(available)\n• 需求狀態恢復為「待支援」(pending)');
+      setVolunteer({ ...volunteer, status: 'available' });
+    },
+    onError: (error) => {
+      console.error('拒絕派單失敗:', error);
+      alert('拒絕派單失敗: ' + error.message);
+    },
+    refetchQueries: [{ query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } }]
+  });
+
+  const handleAccept = () => {
+    confirmAssignment({
+      variables: {
+        assignment_id: assignment.id,
+        volunteer_id: volunteer.id,
+        request_id: assignment.disaster_request?.id
+      }
+    });
+  };
+
   const handleReject = () => {
     const reason = prompt('請輸入拒絕原因（選填）：');
-    alert('❌ 任務已拒絕\n• 您的狀態恢復為「已上線」(available)\n• 需求狀態恢復為「待支援」(pending)');
-    setVolunteer({ ...volunteer, status: 'available' });
+    rejectAssignment({
+      variables: {
+        assignment_id: assignment.id,
+        volunteer_id: volunteer.id,
+        request_id: assignment.disaster_request?.id,
+        rejection_reason: reason || ''
+      }
+    });
   };
 
   const handleCall = () => {
@@ -381,13 +545,13 @@ function PendingAssignment({ assignment, volunteer, setVolunteer }) {
       <p className="text-sm text-gray-700 mb-4 line-clamp-2">{assignment.disaster_request?.description}</p>
       
       <div className="flex space-x-3">
-        <button onClick={handleAccept} className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-xl font-bold transition-all shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center space-x-2">
+        <button onClick={handleAccept} disabled={confirming || rejecting} className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-xl font-bold transition-all shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
           <Check className="w-5 h-5" />
-          <span>接受任務</span>
+          <span>{confirming ? '處理中...' : '接受任務'}</span>
         </button>
-        <button onClick={handleReject} className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2">
+        <button onClick={handleReject} disabled={confirming || rejecting} className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
           <XCircle className="w-5 h-5" />
-          <span>拒絕</span>
+          <span>{rejecting ? '處理中...' : '拒絕'}</span>
         </button>
       </div>
     </div>
@@ -397,7 +561,16 @@ function PendingAssignment({ assignment, volunteer, setVolunteer }) {
 // 任務頁面
 function TasksPage({ volunteer, setVolunteer }) {
   const [filter, setFilter] = useState('all');
-  const assignments = mockAssignments;
+  
+  const { data: assignmentsData, loading: loadingAssignments } = useQuery(
+    GET_VOLUNTEER_ASSIGNMENTS,
+    {
+      variables: { volunteer_id: volunteer.id },
+      pollInterval: 5000
+    }
+  );
+
+  const assignments = assignmentsData?.assignments || [];
   const filteredTasks = filter === 'all' ? assignments : assignments.filter(t => t.status === filter);
 
   const statusConfig = {
@@ -408,9 +581,26 @@ function TasksPage({ volunteer, setVolunteer }) {
   };
 
   // V3: 志工完成任務
+  const [completeAssignment, { loading: completing }] = useMutation(COMPLETE_ASSIGNMENT, {
+    onCompleted: () => {
+      alert('✅ 任務已完成！\n• 您的狀態恢復為「已上線」(available)\n• 需求狀態更新為「已完成」(completed)');
+      setVolunteer({ ...volunteer, status: 'available' });
+    },
+    onError: (error) => {
+      console.error('完成任務失敗:', error);
+      alert('完成任務失敗: ' + error.message);
+    },
+    refetchQueries: [{ query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } }]
+  });
+
   const handleComplete = (assignment) => {
-    alert('✅ 任務已完成！\n• 您的狀態恢復為「已上線」(available)\n• 需求狀態更新為「已完成」(completed)');
-    setVolunteer({ ...volunteer, status: 'available' });
+    completeAssignment({
+      variables: {
+        assignment_id: assignment.id,
+        volunteer_id: volunteer.id,
+        request_id: assignment.disaster_request?.id
+      }
+    });
   };
 
   return (
@@ -423,12 +613,17 @@ function TasksPage({ volunteer, setVolunteer }) {
       <div className="flex space-x-2 overflow-x-auto pb-2">
         <FilterChip label="全部" active={filter === 'all'} onClick={() => setFilter('all')} count={assignments.length} />
         <FilterChip label="待確認" active={filter === 'pending'} onClick={() => setFilter('pending')} count={assignments.filter(a => a.status === 'pending').length} />
-        <FilterChip label="已確認" active={filter === 'confirmed'} onClick={() => setFilter('confirmed')} count={0} />
-        <FilterChip label="已完成" active={filter === 'completed'} onClick={() => setFilter('completed')} count={0} />
+        <FilterChip label="已確認" active={filter === 'confirmed'} onClick={() => setFilter('confirmed')} count={assignments.filter(a => a.status === 'confirmed').length} />
+        <FilterChip label="已完成" active={filter === 'completed'} onClick={() => setFilter('completed')} count={assignments.filter(a => a.status === 'completed').length} />
       </div>
 
       <div className="space-y-4">
-        {filteredTasks.length === 0 ? (
+        {loadingAssignments ? (
+          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-500">載入中...</p>
+          </div>
+        ) : filteredTasks.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
             <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 text-lg">目前沒有任務</p>
@@ -470,9 +665,9 @@ function TasksPage({ volunteer, setVolunteer }) {
               <p className="text-sm text-gray-600 mb-4">{task.disaster_request?.description}</p>
               
               {task.status === 'confirmed' && (
-                <button onClick={() => handleComplete(task)} className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2">
+                <button onClick={() => handleComplete(task)} disabled={completing} className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
                   <CheckCircle className="w-5 h-5" />
-                  <span>標記為完成</span>
+                  <span>{completing ? '處理中...' : '標記為完成'}</span>
                 </button>
               )}
             </div>
@@ -504,6 +699,18 @@ function ProfilePage({ volunteer }) {
     assigned: { label: '執行中', color: 'text-blue-600', bgColor: 'bg-blue-100' }
   };
 
+  // 查詢完整的志工資料
+  const { data: profileData } = useQuery(
+    GET_VOLUNTEER_PROFILE,
+    {
+      variables: { id: volunteer.id },
+      pollInterval: 10000
+    }
+  );
+
+  const profile = profileData?.volunteers_by_pk || volunteer;
+  const completedTasks = profile.assignments?.filter(a => a.status === 'completed').length || 0;
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
@@ -511,10 +718,10 @@ function ProfilePage({ volunteer }) {
           <div className="w-24 h-24 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mb-4 shadow-2xl">
             <User className="w-12 h-12 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-800">{volunteer.name}</h2>
-          <div className={`mt-2 px-4 py-2 rounded-full ${statusConfig[volunteer.status].bgColor}`}>
-            <span className={`text-sm font-bold ${statusConfig[volunteer.status].color}`}>
-              {statusConfig[volunteer.status].label}
+          <h2 className="text-2xl font-bold text-gray-800">{profile.name}</h2>
+          <div className={`mt-2 px-4 py-2 rounded-full ${statusConfig[profile.status].bgColor}`}>
+            <span className={`text-sm font-bold ${statusConfig[profile.status].color}`}>
+              {statusConfig[profile.status].label}
             </span>
           </div>
         </div>
@@ -524,15 +731,15 @@ function ProfilePage({ volunteer }) {
             <Phone className="w-5 h-5 text-red-600 mr-3" />
             <div>
               <p className="text-xs text-gray-500">聯絡電話</p>
-              <p className="text-sm font-semibold text-gray-800">{volunteer.phone}</p>
+              <p className="text-sm font-semibold text-gray-800">{profile.phone}</p>
             </div>
           </div>
-          {volunteer.email && (
+          {profile.email && (
             <div className="flex items-center p-4 bg-gray-50 rounded-xl">
               <Mail className="w-5 h-5 text-red-600 mr-3" />
               <div>
                 <p className="text-xs text-gray-500">Email</p>
-                <p className="text-sm font-semibold text-gray-800">{volunteer.email}</p>
+                <p className="text-sm font-semibold text-gray-800">{profile.email}</p>
               </div>
             </div>
           )}
@@ -540,18 +747,18 @@ function ProfilePage({ volunteer }) {
             <Users className="w-5 h-5 text-red-600 mr-3" />
             <div>
               <p className="text-xs text-gray-500">可派遣人數</p>
-              <p className="text-sm font-semibold text-gray-800">{volunteer.member_count} 人</p>
+              <p className="text-sm font-semibold text-gray-800">{profile.member_count} 人</p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200">
-            <p className="text-3xl font-bold text-green-600">12</p>
+            <p className="text-3xl font-bold text-green-600">{completedTasks}</p>
             <p className="text-xs text-green-700 mt-1">完成任務數</p>
           </div>
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-200">
-            <p className="text-3xl font-bold text-blue-600">36</p>
+            <p className="text-3xl font-bold text-blue-600">{completedTasks * 3}</p>
             <p className="text-xs text-blue-700 mt-1">服務時數</p>
           </div>
         </div>

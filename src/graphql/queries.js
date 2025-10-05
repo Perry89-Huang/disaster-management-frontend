@@ -2,7 +2,7 @@ import { gql } from '@apollo/client';
 
 // ========== 志工相關查詢 ==========
 
-// 志工登入驗證
+// 志工登入驗證（這是 query 不是 mutation）
 export const VERIFY_VOLUNTEER = gql`
   query VerifyVolunteer($phone: String!, $name: String!) {
     volunteers(
@@ -181,13 +181,12 @@ export const GET_ASSIGNMENTS = gql`
   }
 `;
 
-// 查詢志工的派單（志工端使用）
+// 查詢志工的派單（志工端使用）- 移除 status 篩選以獲取所有派單
 export const GET_VOLUNTEER_ASSIGNMENTS = gql`
-  query GetVolunteerAssignments($volunteer_id: uuid!, $status: String) {
+  query GetVolunteerAssignments($volunteer_id: uuid!) {
     assignments(
       where: {
         volunteer_id: { _eq: $volunteer_id }
-        status: { _eq: $status }
       }
       order_by: { assigned_at: desc }
     ) {
@@ -356,10 +355,6 @@ export const GET_REQUEST_WITH_ASSIGNMENTS = gql`
       status
       created_at
       
-      # 使用計算欄位獲取已派遣總人數（需要在 Hasura 中設定）
-      # assigned_volunteers_total
-      # confirmed_volunteers_total
-      
       # 獲取所有派單記錄
       assignments(
         order_by: { assigned_at: desc }
@@ -377,7 +372,7 @@ export const GET_REQUEST_WITH_ASSIGNMENTS = gql`
         }
       }
       
-      # 手動計算已派遣人數（暫時方案）
+      # 手動計算已派遣人數
       assignments_aggregate(
         where: { status: { _in: ["pending", "confirmed"] } }
       ) {
