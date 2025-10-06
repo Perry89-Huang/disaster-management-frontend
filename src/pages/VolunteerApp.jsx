@@ -123,7 +123,27 @@ function AuthScreen({ onLogin }) {
       },
       onError: (error) => {
         console.error('註冊錯誤:', error);
-        alert('註冊失敗: ' + error.message);
+        let userFriendlyMessage = '';
+        
+      if (error.message.includes('duplicate') || 
+          error.message.includes('unique constraint') ||
+          error.message.includes('volunteers_phone_key')) {
+        userFriendlyMessage = '❌ 註冊失敗\n\n此手機號碼已經被註冊過了！\n\n如果您已經註冊過，請直接使用「志工登入」功能。';
+      } 
+      // 檢查是否為網路錯誤
+      else if (error.message.includes('network') || error.message.includes('fetch')) {
+        userFriendlyMessage = '❌ 註冊失敗\n\n網路連線異常，請檢查您的網路連線後再試一次。';
+      }
+      // 檢查是否為必填欄位錯誤
+      else if (error.message.includes('NOT NULL') || error.message.includes('required')) {
+        userFriendlyMessage = '❌ 註冊失敗\n\n請確認所有必填欄位都已填寫。';
+      }
+      // 其他錯誤
+      else {
+        userFriendlyMessage = `❌ 註冊失敗\n\n${error.message}\n\n請稍後再試，或聯絡管理員。`;
+      }
+      
+        alert(userFriendlyMessage);
       }
     }
   );
