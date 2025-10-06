@@ -360,9 +360,7 @@ function VolunteerManagement() {
         alert('更新成功！');
       } else {
         await createVolunteer({
-          variables: {
-            object: formData
-          }
+          variables: formData  // ✅ 修正：直接傳入 formData
         });
         alert('新增成功！');
       }
