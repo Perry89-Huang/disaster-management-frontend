@@ -512,24 +512,26 @@ function PendingAssignment({ assignment, volunteer, setVolunteer }) {
     refetchQueries: [{ query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } }]
   });
 
+  // ✅ 修正：移除 request_id 參數
   const handleAccept = () => {
     confirmAssignment({
       variables: {
         assignment_id: assignment.id,
-        volunteer_id: volunteer.id,
-        request_id: assignment.disaster_request?.id
+        volunteer_id: volunteer.id
+        // ❌ 不需要: request_id: assignment.disaster_request?.id
       }
     });
   };
 
+  // ✅ 修正：移除 request_id 參數
   const handleReject = () => {
     const reason = prompt('請輸入拒絕原因（選填）：');
     rejectAssignment({
       variables: {
         assignment_id: assignment.id,
         volunteer_id: volunteer.id,
-        request_id: assignment.disaster_request?.id,
         rejection_reason: reason || ''
+        // ❌ 不需要: request_id: assignment.disaster_request?.id
       }
     });
   };

@@ -280,12 +280,11 @@ export const ASSIGN_VOLUNTEER = gql`
   }
 `;
 
-// V1: 志工確認派單
+// V1: 志工確認派單 ✅ 修正：移除 request_id 參數
 export const CONFIRM_ASSIGNMENT = gql`
   mutation ConfirmAssignment(
     $assignment_id: uuid!
     $volunteer_id: uuid!
-    $request_id: uuid!
   ) {
     # 更新派單狀態：pending → confirmed
     update_assignments_by_pk(
@@ -308,17 +307,14 @@ export const CONFIRM_ASSIGNMENT = gql`
       id
       status
     }
-    
-    # 需求已經在派單時變成 in_progress，這裡不需要更新
   }
 `;
 
-// V2: 志工拒絕派單
+// V2: 志工拒絕派單 ✅ 修正：移除 request_id 參數
 export const REJECT_ASSIGNMENT = gql`
   mutation RejectAssignment(
     $assignment_id: uuid!
     $volunteer_id: uuid!
-    $request_id: uuid!
     $rejection_reason: String
   ) {
     # 更新派單狀態：pending → rejected
@@ -343,9 +339,6 @@ export const REJECT_ASSIGNMENT = gql`
       id
       status
     }
-    
-    # 需求狀態維持 in_progress（因為可能還有其他志工在處理）
-    # 如果需要檢查是否所有志工都拒絕，需要在後端 action 處理
   }
 `;
 
@@ -379,9 +372,6 @@ export const CANCEL_ASSIGNMENT = gql`
       id
       status
     }
-    
-    # 需求狀態維持 in_progress（因為可能還有其他志工在處理）
-    # 如果需要取消整個需求，使用 CANCEL_REQUEST mutation
   }
 `;
 
@@ -414,8 +404,7 @@ export const COMPLETE_ASSIGNMENT = gql`
       status
     }
     
-    # 檢查需求是否所有派單都完成，如果是則更新為 completed
-    # 這部分需要在後端 action 處理，或使用以下邏輯手動完成
+    # 更新需求狀態為 completed
     update_disaster_requests_by_pk(
       pk_columns: { id: $request_id }
       _set: { status: "completed" }
