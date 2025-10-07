@@ -6,7 +6,7 @@ import VolunteerApp from './pages/VolunteerApp';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/superman">  {/* 🔑 設置 basename */}
       <Routes>
         <Route path="/" element={<AdminApp />} />
         <Route path="/admin" element={<AdminApp />} />
@@ -21,8 +21,8 @@ function NotFound() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="text-center">
-        <h1 className="text-6xl font-bold text-gray-800 mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-8">找不到頁面</p>
+        <h2 className="text-6xl font-bold text-gray-800 mb-4">花蓮縣光復救災資源管理系統</h2>
+        <p className="text-xl text-gray-600 mb-8">....</p>
         <div className="space-x-4">
           <Link 
             to="/admin" 

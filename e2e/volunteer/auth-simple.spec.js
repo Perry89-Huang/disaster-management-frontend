@@ -9,7 +9,8 @@ import {
   isVolunteerLoggedIn,
   switchAuthMode,
   createMultipleTestVolunteers,
-  takeScreenshot
+  takeScreenshot,
+  waitForLogout 
 } from '../helpers/auth-helpers.js';
 
 /**
@@ -138,7 +139,7 @@ test.describe('志工認證 - 簡化測試（優化版）', () => {
     
     console.log(`✅ 錯誤登入正確被拒絕`);
   });
-  
+
   // ==================== 完整流程測試 ====================
   
   test('註冊並登入 - 一步完成', async ({ page }) => {
@@ -163,29 +164,86 @@ test.describe('志工認證 - 簡化測試（優化版）', () => {
   });
 
   test('完整流程: 註冊 → 登入 → 登出', async ({ page }) => {
-    console.log('🧪 測試：完整生命週期');
-    
-    // 步驟1: 註冊並登入
-    const volunteer = await registerAndLogin(page);
-    console.log(`  ✓ 步驟1: 註冊並登入完成`);
-    
-    // 步驟2: 驗證登入成功
-    let isLoggedIn = await isVolunteerLoggedIn(page);
-    expect(isLoggedIn).toBe(true);
-    console.log(`  ✓ 步驟2: 登入狀態驗證`);
-    
-    // 步驟3: 登出
-    const logoutSuccess = await logoutVolunteer(page);
-    expect(logoutSuccess).toBe(true);
-    console.log(`  ✓ 步驟3: 登出完成`);
-    
-    // 步驟4: 驗證已登出
-    isLoggedIn = await isVolunteerLoggedIn(page);
-    expect(isLoggedIn).toBe(false);
-    console.log(`  ✓ 步驟4: 登出狀態驗證`);
-    
-    console.log(`✅ 完整生命週期測試通過`);
+  const timestamp = Date.now();
+  const testUser = {
+    name: `測試志工_${timestamp}`,
+    phone: `0912${timestamp.toString().slice(-6)}`,
+    email: `test_${timestamp}@example.com`
+  };
+
+  console.log('📱 開始測試完整流程...');
+  
+  await page.goto('http://localhost:5173/volunteer');
+  await page.waitForLoadState('networkidle');
+
+  // ========== 步驟1: 註冊 ==========
+  console.log('✅ 步驟1: 註冊新志工');
+  
+  // 切換到註冊 Tab
+  await page.click('button:has-text("志工註冊")');
+  await page.waitForTimeout(500);
+  
+  // 填寫註冊表單
+  await page.fill('input[placeholder="請輸入姓名"]', testUser.name);
+  await page.fill('input[placeholder="0912-345-678"]', testUser.phone);
+  await page.fill('input[placeholder="example@email.com"]', testUser.email);
+  
+  // 點擊註冊按鈕
+  await page.click('button:has-text("完成註冊")');
+  
+  // 等待註冊成功的 alert
+  page.once('dialog', dialog => {
+    console.log('  ℹ️ Alert 訊息:', dialog.message());
+    expect(dialog.message()).toContain('註冊成功');
+    dialog.accept();
   });
+  
+  await page.waitForTimeout(2000);
+  
+  // 驗證自動切換回登入 Tab
+  const loginTabActive = await page.locator('button:has-text("志工登入")').evaluate(
+    el => el.classList.contains('bg-white') && el.classList.contains('text-red-600')
+  );
+  expect(loginTabActive).toBe(true);
+  console.log('  ✓ 註冊成功，已自動切換到登入頁面');
+
+  // ========== 步驟2: 登入 ==========
+  console.log('✅ 步驟2: 使用新帳號登入');
+  
+  // 填寫登入表單（註冊成功後應該已經在登入 Tab）
+  await page.fill('input[placeholder="0912-345-678"]', testUser.phone);
+  await page.fill('input[placeholder="請輸入姓名"]', testUser.name);
+  
+  // 點擊登入按鈕
+  await page.click('button:has-text("登入")');
+  
+  // 等待登入成功的 alert
+  page.once('dialog', dialog => {
+    console.log('  ℹ️ Alert 訊息:', dialog.message());
+    expect(dialog.message()).toContain('登入成功');
+    dialog.accept();
+  });
+  
+  // 等待頁面完全載入
+  await page.waitForTimeout(2000);
+  await page.waitForLoadState('networkidle');
+  
+  
+
+  // ========== 步驟4: 登出 ==========
+  console.log('✅ 步驟4: 執行登出');
+  
+  // 點擊登出按鈕
+  await page.click('button:has-text("登出")');
+  
+  // 🔥 使用專門的等待函數
+  await waitForLogout(page);
+  
+   // 驗證登出
+    isLoggedIn = await isVolunteerLoggedIn(page);
+   expect(isLoggedIn).toBe(false);
+   console.log('  ✓ 完整生命週期測試通過');
+});
 
   // ==================== Tab 切換測試 ====================
   

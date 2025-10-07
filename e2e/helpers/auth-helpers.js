@@ -272,17 +272,56 @@ export async function logoutVolunteer(page) {
 }
 
 /**
- * 驗證登入狀態（優化版）
+  * 檢查志工是否已登入（嚴謹版本）
  * @param {Page} page - Playwright page 物件
- * @returns {Boolean} 是否已登入
+ * @returns {Promise<boolean>} 是否已登入
  */
 export async function isVolunteerLoggedIn(page) {
   try {
-    await page.waitForSelector('text=光復救災志工', { timeout: 2000 });
-    return true;
-  } catch (e) {
+    // 等待頁面穩定
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(500);
+    
+    // 檢查登入狀態的多個指標
+    const hasLogoutButton = await page.locator('button:has-text("登出")').count() > 0;
+    const hasWelcomeText = await page.locator('text=歡迎回來').count() > 0;
+    const hasLoginForm = await page.locator('button:has-text("志工登入")').count() > 0;
+    
+    // 已登入 = 有登出按鈕 且 有歡迎文字 且 沒有登入表單
+    const isLoggedIn = hasLogoutButton && hasWelcomeText && !hasLoginForm;
+    
+    console.log(`  🔍 登入狀態檢查: ${isLoggedIn ? '已登入' : '未登入'}`);
+    console.log(`     - 登出按鈕: ${hasLogoutButton}`);
+    console.log(`     - 歡迎文字: ${hasWelcomeText}`);
+    console.log(`     - 登入表單: ${hasLoginForm}`);
+    
+    return isLoggedIn;
+  } catch (error) {
+    console.error('  ❌ 檢查登入狀態時出錯:', error.message);
     return false;
   }
+}
+
+/**
+ * 等待登出完成
+ * @param {Page} page - Playwright page 物件
+ */
+export async function waitForLogout(page) {
+  console.log('  ⏳ 等待登出完成...');
+  
+  // 等待登入表單出現
+  await page.waitForSelector('button:has-text("志工登入")', { 
+    state: 'visible',
+    timeout: 5000 
+  });
+  
+  // 確認登出按鈕消失
+  await page.waitForSelector('button:has-text("登出")', { 
+    state: 'hidden',
+    timeout: 5000 
+  });
+  
+  console.log('  ✓ 登出完成');
 }
 
 /**
