@@ -80,9 +80,9 @@ export async function createRequest(page, requestData = null) {
 export async function editRequest(page, contactName, updates) {
   console.log(`\n✏️ 編輯需求: ${contactName}`);
   
-  // 找到需求卡片並點擊編輯
-  const requestCard = page.locator(`div:has-text("${contactName}")`).first();
-  await requestCard.locator('button:has-text("編輯")').click();
+  // 找到需求卡片並點擊編輯 - 使用更精確的選擇器
+  const requestCard = page.locator('div.bg-white.rounded-xl.shadow-lg').filter({ hasText: contactName }).first();
+  await requestCard.getByRole('button', { name: '編輯' }).click();
   await page.waitForTimeout(500);
   
   // 更新欄位
@@ -133,9 +133,9 @@ export async function editRequest(page, contactName, updates) {
 export async function deleteRequest(page, contactName, confirm = true) {
   console.log(`\n🗑️ 刪除需求: ${contactName}`);
   
-  // 找到需求卡片並點擊刪除
-  const requestCard = page.locator(`div:has-text("${contactName}")`).first();
-  await requestCard.locator('button:has-text("刪除")').click();
+  // 找到需求卡片並點擊刪除 - 使用更精確的選擇器
+  const requestCard = page.locator('div.bg-white.rounded-xl.shadow-lg').filter({ hasText: contactName }).first();
+  await requestCard.getByRole('button', { name: '刪除' }).click();
   await page.waitForTimeout(300);
   
   // 處理確認對話框
@@ -164,7 +164,7 @@ export async function deleteRequest(page, contactName, confirm = true) {
  * @returns {Promise<boolean>} 是否存在
  */
 export async function requestExists(page, contactName) {
-  const count = await page.locator(`div:has-text("${contactName}")`).count();
+  const count = await page.locator('div.bg-white.rounded-xl.shadow-lg').filter({ hasText: contactName }).count();
   const exists = count > 0;
   console.log(`檢查需求 "${contactName}": ${exists ? '存在' : '不存在'}`);
   return exists;
@@ -285,23 +285,50 @@ export async function cleanupTestRequests(page, prefix) {
   let maxAttempts = 50; // 防止無限迴圈
   
   while (maxAttempts > 0) {
-    // 尋找包含前綴的需求
-    const testRequests = page.locator(`div:has-text("${prefix}")`).filter({ hasText: /聯絡人/ });
+    // 尋找包含前綴的需求卡片
+    const testRequests = page.locator('div.bg-white.rounded-xl.shadow-lg').filter({ hasText: new RegExp(prefix) });
     const count = await testRequests.count();
     
     if (count === 0) {
       break;
     }
     
-    // 找到第一個測試需求的聯絡人名稱
+    // 找到第一個測試需求
     const firstRequest = testRequests.first();
     const text = await firstRequest.textContent();
-    const nameMatch = text.match(new RegExp(`${prefix}[^\\s]*`));
+    
+    // 提取聯絡人名稱（尋找包含前綴的文字）
+    const nameMatch = text.match(new RegExp(`${prefix}[^\\s]*_\\d+`));
     
     if (nameMatch) {
       const contactName = nameMatch[0];
-      await deleteRequest(page, contactName, true);
-      deletedCount++;
+      
+      // 使用更精確的方式找到刪除按鈕
+      try {
+        await firstRequest.getByRole('button', { name: '刪除' }).click();
+        
+        // 處理確認對話框
+        page.once('dialog', dialog => dialog.accept());
+        await page.waitForTimeout(1000);
+        
+        deletedCount++;
+        console.log(`  ✓ 已刪除: ${contactName}`);
+      } catch (error) {
+        console.log(`  ⚠️ 無法刪除: ${error.message}`);
+        break;
+      }
+    } else {
+      // 如果無法匹配名稱，直接刪除第一個
+      try {
+        await firstRequest.getByRole('button', { name: '刪除' }).click();
+        page.once('dialog', dialog => dialog.accept());
+        await page.waitForTimeout(1000);
+        deletedCount++;
+        console.log(`  ✓ 已刪除測試需求 ${deletedCount}`);
+      } catch (error) {
+        console.log(`  ⚠️ 無法刪除: ${error.message}`);
+        break;
+      }
     }
     
     maxAttempts--;
@@ -321,7 +348,7 @@ export async function cleanupTestRequests(page, prefix) {
 export async function verifyRequestDetails(page, contactName, expectedData) {
   console.log(`\n🔍 驗證需求詳細資訊: ${contactName}`);
   
-  const requestCard = page.locator(`div:has-text("${contactName}")`).first();
+  const requestCard = page.locator('div.bg-white.rounded-xl.shadow-lg').filter({ hasText: contactName }).first();
   const cardText = await requestCard.textContent();
   
   let allMatch = true;

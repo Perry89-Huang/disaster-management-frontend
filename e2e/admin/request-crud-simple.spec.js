@@ -22,7 +22,7 @@ test.describe('需求管理 - 簡化測試', () => {
   
   test.beforeEach(async ({ page }) => {
     // 導航並切換到需求管理
-    await page.goto('http://localhost:5173/admin');
+    await page.goto('http://localhost:5173/superman/admin');
     await page.click('button:has-text("需求管理")');
     await page.waitForTimeout(1000);
     
