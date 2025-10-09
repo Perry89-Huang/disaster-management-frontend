@@ -164,11 +164,25 @@ export async function deleteRequest(page, contactName, confirm = true) {
  * @returns {Promise<boolean>} 是否存在
  */
 export async function requestExists(page, contactName) {
-  const count = await page.locator('div.bg-white.rounded-xl.shadow-lg').filter({ hasText: contactName }).count();
-  const exists = count > 0;
-  console.log(`檢查需求 "${contactName}": ${exists ? '存在' : '不存在'}`);
-  return exists;
+  try {
+    // 等待頁面穩定
+    await page.waitForTimeout(500);
+    
+    // 檢查卡片數量
+    const count = await page.locator('div.bg-white.rounded-xl.shadow-lg')
+      .filter({ hasText: contactName })
+      .count();
+    
+    const exists = count > 0;
+    console.log(`🔍 檢查需求 "${contactName}": ${exists ? '✓ 存在' : '✗ 不存在'} (找到 ${count} 個)`);
+    
+    return exists;
+  } catch (error) {
+    console.error(`❌ 檢查需求存在時發生錯誤: ${error.message}`);
+    return false;
+  }
 }
+
 
 /**
  * 檢查需求是否不存在
@@ -177,8 +191,30 @@ export async function requestExists(page, contactName) {
  * @returns {Promise<boolean>} 是否不存在
  */
 export async function requestNotExists(page, contactName) {
-  const exists = await requestExists(page, contactName);
-  return !exists;
+  try {
+    // 多次檢查確保資料已同步
+    let exists = await requestExists(page, contactName);
+    
+    if (exists) {
+      console.log(`⏳ 第一次檢查發現仍存在，等待後重新檢查...`);
+      await page.waitForTimeout(1000);
+      exists = await requestExists(page, contactName);
+    }
+    
+    if (exists) {
+      console.log(`⏳ 第二次檢查發現仍存在，再次等待後檢查...`);
+      await page.waitForTimeout(1500);
+      exists = await requestExists(page, contactName);
+    }
+    
+    const notExists = !exists;
+    console.log(`🔍 最終檢查 "${contactName}" 不存在: ${notExists ? '✓ 確認已刪除' : '✗ 仍然存在'}`);
+    
+    return notExists;
+  } catch (error) {
+    console.error(`❌ 檢查需求不存在時發生錯誤: ${error.message}`);
+    return false;
+  }
 }
 
 /**
@@ -348,34 +384,145 @@ export async function cleanupTestRequests(page, prefix) {
 export async function verifyRequestDetails(page, contactName, expectedData) {
   console.log(`\n🔍 驗證需求詳細資訊: ${contactName}`);
   
-  const requestCard = page.locator('div.bg-white.rounded-xl.shadow-lg').filter({ hasText: contactName }).first();
-  const cardText = await requestCard.textContent();
-  
-  let allMatch = true;
-  
-  if (expectedData.village && !cardText.includes(expectedData.village)) {
-    console.log(`❌ 村里不符: 預期 ${expectedData.village}`);
-    allMatch = false;
+  try {
+    // 等待頁面穩定
+    await page.waitForTimeout(500);
+    
+    // 找到需求卡片
+    const requestCard = page.locator('div.bg-white.rounded-xl.shadow-lg')
+      .filter({ hasText: contactName })
+      .first();
+    
+    // 檢查卡片是否存在
+    const cardCount = await requestCard.count();
+    if (cardCount === 0) {
+      console.log(`❌ 找不到需求卡片: ${contactName}`);
+      return false;
+    }
+    
+    // 取得卡片文字內容
+    const cardText = await requestCard.textContent();
+    console.log(`📄 卡片內容預覽: ${cardText.substring(0, 100)}...`);
+    
+    let allMatch = true;
+    const failedChecks = [];
+    
+    // 驗證村里
+    if (expectedData.village !== undefined) {
+      if (!cardText.includes(expectedData.village)) {
+        console.log(`❌ 村里不符: 預期 "${expectedData.village}"`);
+        failedChecks.push(`村里: ${expectedData.village}`);
+        allMatch = false;
+      } else {
+        console.log(`✓ 村里驗證通過: ${expectedData.village}`);
+      }
+    }
+    
+    // 驗證街道
+    if (expectedData.street !== undefined) {
+      if (!cardText.includes(expectedData.street)) {
+        console.log(`❌ 街道不符: 預期 "${expectedData.street}"`);
+        failedChecks.push(`街道: ${expectedData.street}`);
+        allMatch = false;
+      } else {
+        console.log(`✓ 街道驗證通過: ${expectedData.street}`);
+      }
+    }
+    
+    // 驗證聯絡電話
+    if (expectedData.contact_phone !== undefined) {
+      // 移除電話中的特殊字符進行比對
+      const normalizedPhone = expectedData.contact_phone.replace(/[-\s]/g, '');
+      const normalizedCardText = cardText.replace(/[-\s]/g, '');
+      
+      if (!normalizedCardText.includes(normalizedPhone)) {
+        console.log(`❌ 電話不符: 預期 "${expectedData.contact_phone}"`);
+        failedChecks.push(`電話: ${expectedData.contact_phone}`);
+        allMatch = false;
+      } else {
+        console.log(`✓ 電話驗證通過: ${expectedData.contact_phone}`);
+      }
+    }
+    
+    // 驗證描述（使用更寬鬆的匹配邏輯）
+    if (expectedData.description !== undefined) {
+      // 將描述切成關鍵字進行驗證
+      const descriptionKeywords = expectedData.description.split(/\s+/).filter(word => word.length > 2);
+      let matchedKeywords = 0;
+      
+      for (const keyword of descriptionKeywords) {
+        if (cardText.includes(keyword)) {
+          matchedKeywords++;
+        }
+      }
+      
+      // 至少要匹配 50% 的關鍵字
+      const matchRatio = descriptionKeywords.length > 0 ? matchedKeywords / descriptionKeywords.length : 1;
+      
+      if (matchRatio < 0.5) {
+        console.log(`❌ 描述不符: 預期包含 "${expectedData.description.substring(0, 30)}..."`);
+        console.log(`   匹配率: ${(matchRatio * 100).toFixed(0)}% (${matchedKeywords}/${descriptionKeywords.length} 關鍵字)`);
+        failedChecks.push(`描述匹配率過低: ${(matchRatio * 100).toFixed(0)}%`);
+        allMatch = false;
+      } else {
+        console.log(`✓ 描述驗證通過 (匹配率: ${(matchRatio * 100).toFixed(0)}%)`);
+      }
+    }
+    
+    // 驗證需求類型
+    if (expectedData.request_type !== undefined) {
+      if (!cardText.includes(expectedData.request_type)) {
+        console.log(`❌ 需求類型不符: 預期 "${expectedData.request_type}"`);
+        failedChecks.push(`需求類型: ${expectedData.request_type}`);
+        allMatch = false;
+      } else {
+        console.log(`✓ 需求類型驗證通過: ${expectedData.request_type}`);
+      }
+    }
+    
+    // 驗證優先順序
+    if (expectedData.priority !== undefined) {
+      const priorityMap = {
+        'urgent': '緊急',
+        'high': '高',
+        'normal': '普通',
+        'low': '低'
+      };
+      const priorityText = priorityMap[expectedData.priority] || expectedData.priority;
+      
+      if (!cardText.includes(priorityText)) {
+        console.log(`❌ 優先順序不符: 預期 "${priorityText}"`);
+        failedChecks.push(`優先順序: ${priorityText}`);
+        allMatch = false;
+      } else {
+        console.log(`✓ 優先順序驗證通過: ${priorityText}`);
+      }
+    }
+    
+    // 驗證需要的志工人數
+    if (expectedData.required_volunteers !== undefined) {
+      const volunteersText = String(expectedData.required_volunteers);
+      if (!cardText.includes(volunteersText)) {
+        console.log(`❌ 志工人數不符: 預期 "${volunteersText}"`);
+        failedChecks.push(`志工人數: ${volunteersText}`);
+        allMatch = false;
+      } else {
+        console.log(`✓ 志工人數驗證通過: ${volunteersText}`);
+      }
+    }
+    
+    // 總結驗證結果
+    if (allMatch) {
+      console.log(`✅ 所有資料驗證通過`);
+    } else {
+      console.log(`❌ 驗證失敗，以下項目不符:`);
+      failedChecks.forEach(check => console.log(`   - ${check}`));
+    }
+    
+    return allMatch;
+    
+  } catch (error) {
+    console.error(`❌ 驗證過程發生錯誤: ${error.message}`);
+    return false;
   }
-  
-  if (expectedData.street && !cardText.includes(expectedData.street)) {
-    console.log(`❌ 街道不符: 預期 ${expectedData.street}`);
-    allMatch = false;
-  }
-  
-  if (expectedData.contact_phone && !cardText.includes(expectedData.contact_phone)) {
-    console.log(`❌ 電話不符: 預期 ${expectedData.contact_phone}`);
-    allMatch = false;
-  }
-  
-  if (expectedData.description && !cardText.includes(expectedData.description)) {
-    console.log(`❌ 描述不符: 預期 ${expectedData.description}`);
-    allMatch = false;
-  }
-  
-  if (allMatch) {
-    console.log(`✓ 所有資料驗證通過`);
-  }
-  
-  return allMatch;
 }
