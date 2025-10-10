@@ -14,11 +14,14 @@ import {
   VERIFY_VOLUNTEER,
   GET_VOLUNTEER_PROFILE
 } from '../graphql/queries';
+import DemandPage from './DemandPage';
+
 
 // 主應用程式元件
 export default function VolunteerApp() {
   const [volunteer, setVolunteer] = useState(null);
   const [currentPage, setCurrentPage] = useState('home');
+  
 
   const handleLogout = () => {
     setVolunteer(null);
@@ -59,6 +62,7 @@ export default function VolunteerApp() {
       {/* 主要內容 */}
       <div className="max-w-7xl mx-auto p-4">
         {currentPage === 'home' && <HomePage volunteer={volunteer} setVolunteer={setVolunteer} />}
+        {currentPage === 'demands' && <DemandPage volunteer={volunteer} />}  
         {currentPage === 'tasks' && <TasksPage volunteer={volunteer} setVolunteer={setVolunteer} />}
         {currentPage === 'profile' && <ProfilePage volunteer={volunteer} />}
       </div>
@@ -67,6 +71,7 @@ export default function VolunteerApp() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl z-40">
         <div className="max-w-7xl mx-auto flex justify-around items-center h-16">
           <NavButton icon={<Home />} label="首頁" active={currentPage === 'home'} onClick={() => setCurrentPage('home')} />
+          <NavButton icon={<AlertCircle />}  label="需求"  active={currentPage === 'demands'} onClick={() => setCurrentPage('demands')} />
           <NavButton icon={<CheckCircle />} label="任務" active={currentPage === 'tasks'} onClick={() => setCurrentPage('tasks')} />
           <NavButton icon={<User />} label="我的" active={currentPage === 'profile'} onClick={() => setCurrentPage('profile')} />
         </div>

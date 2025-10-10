@@ -524,3 +524,22 @@ export const RESET_ALL_VOLUNTEERS_TO_OFF = gql`
     }
   }
 `;
+
+export const VOLUNTEER_APPLY_DEMAND = gql`
+  mutation VolunteerApplyDemand(
+    $volunteer_id: uuid!
+    $request_id: uuid!
+  ) {
+    insert_assignments_one(
+      object: {
+        volunteer_id: $volunteer_id
+        request_id: $request_id
+        status: "pending"
+      }
+    ) {
+      id
+      status
+      assigned_at
+    }
+  }
+`;
