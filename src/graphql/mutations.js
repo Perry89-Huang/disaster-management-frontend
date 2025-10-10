@@ -543,3 +543,187 @@ export const VOLUNTEER_APPLY_DEMAND = gql`
     }
   }
 `;
+
+
+// 新增需求者（註冊申請）
+export const CREATE_REQUESTER = gql`
+  mutation CreateRequester(
+    $name: String!
+    $phone: String!
+    $organization: String
+    $notes: String
+  ) {
+    insert_requesters_one(
+      object: {
+        name: $name
+        phone: $phone
+        organization: $organization
+        notes: $notes
+        status: "pending"
+      }
+    ) {
+      id
+      name
+      phone
+      organization
+      status
+      created_at
+    }
+  }
+`;
+
+// 管理員直接新增需求者（已核准狀態）
+export const ADMIN_CREATE_REQUESTER = gql`
+  mutation AdminCreateRequester(
+    $name: String!
+    $phone: String!
+    $organization: String
+    $notes: String
+    $approved_by: String
+  ) {
+    insert_requesters_one(
+      object: {
+        name: $name
+        phone: $phone
+        organization: $organization
+        notes: $notes
+        status: "approved"
+        approved_at: "now()"
+        approved_by: $approved_by
+      }
+    ) {
+      id
+      name
+      phone
+      status
+    }
+  }
+`;
+
+// 核准需求者
+export const APPROVE_REQUESTER = gql`
+  mutation ApproveRequester(
+    $id: uuid!
+    $approved_by: String!
+  ) {
+    update_requesters_by_pk(
+      pk_columns: { id: $id }
+      _set: {
+        status: "approved"
+        approved_at: "now()"
+        approved_by: $approved_by
+      }
+    ) {
+      id
+      name
+      status
+      approved_at
+      approved_by
+    }
+  }
+`;
+
+// 拒絕需求者
+export const REJECT_REQUESTER = gql`
+  mutation RejectRequester(
+    $id: uuid!
+    $rejection_reason: String
+  ) {
+    update_requesters_by_pk(
+      pk_columns: { id: $id }
+      _set: {
+        status: "rejected"
+        rejection_reason: $rejection_reason
+      }
+    ) {
+      id
+      name
+      status
+      rejection_reason
+    }
+  }
+`;
+
+// 更新需求者資料
+export const UPDATE_REQUESTER = gql`
+  mutation UpdateRequester(
+    $id: uuid!
+    $name: String
+    $phone: String
+    $organization: String
+    $notes: String
+  ) {
+    update_requesters_by_pk(
+      pk_columns: { id: $id }
+      _set: {
+        name: $name
+        phone: $phone
+        organization: $organization
+        notes: $notes
+        updated_at: "now()"
+      }
+    ) {
+      id
+      name
+      phone
+      organization
+      notes
+      updated_at
+    }
+  }
+`;
+
+// 刪除需求者
+export const DELETE_REQUESTER = gql`
+  mutation DeleteRequester($id: uuid!) {
+    delete_requesters_by_pk(id: $id) {
+      id
+      name
+    }
+  }
+`;
+
+// ========== 更新 disaster_requests 的 Mutation ==========
+
+// 需求者建立需求（含 requester_id）
+export const REQUESTER_CREATE_REQUEST = gql`
+  mutation RequesterCreateRequest(
+    $requester_id: uuid!
+    $request_type: String!
+    $township: String
+    $village: String!
+    $street: String!
+    $contact_name: String!
+    $contact_phone: String!
+    $description: String!
+    $required_volunteers: Int
+    $priority: String
+    $address_detail: String
+    $notes: String
+  ) {
+    insert_disaster_requests_one(
+      object: {
+        requester_id: $requester_id
+        request_type: $request_type
+        township: $township
+        village: $village
+        street: $street
+        contact_name: $contact_name
+        contact_phone: $contact_phone
+        description: $description
+        required_volunteers: $required_volunteers
+        priority: $priority
+        address_detail: $address_detail
+        notes: $notes
+        status: "pending"
+        created_by: "requester"
+      }
+    ) {
+      id
+      requester_id
+      description
+      status
+      created_at
+    }
+  }
+`;

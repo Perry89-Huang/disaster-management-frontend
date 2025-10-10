@@ -501,3 +501,139 @@ export const UPDATE_REQUEST_STATUS = gql`
     }
   }
 `;
+
+
+// 查詢所有需求者
+export const GET_REQUESTERS = gql`
+  query GetRequesters {
+    requesters(order_by: { created_at: desc }) {
+      id
+      name
+      phone
+      organization
+      notes
+      status
+      created_at
+      updated_at
+      approved_at
+      approved_by
+      rejection_reason
+    }
+  }
+`;
+
+// 查詢待審核的需求者
+export const GET_PENDING_REQUESTERS = gql`
+  query GetPendingRequesters {
+    requesters(
+      where: { status: { _eq: "pending" } }
+      order_by: { created_at: desc }
+    ) {
+      id
+      name
+      phone
+      organization
+      notes
+      status
+      created_at
+    }
+  }
+`;
+
+// 查詢已核准的需求者
+export const GET_APPROVED_REQUESTERS = gql`
+  query GetApprovedRequesters {
+    requesters(
+      where: { status: { _eq: "approved" } }
+      order_by: { approved_at: desc }
+    ) {
+      id
+      name
+      phone
+      organization
+      status
+      approved_at
+      approved_by
+    }
+  }
+`;
+
+// 根據電話和姓名查詢需求者（登入用）
+export const GET_REQUESTER_BY_PHONE_NAME = gql`
+  query GetRequesterByPhoneAndName($phone: String!, $name: String!) {
+    requesters(
+      where: {
+        phone: { _eq: $phone }
+        name: { _eq: $name }
+        status: { _eq: "approved" }
+      }
+      limit: 1
+    ) {
+      id
+      name
+      phone
+      organization
+      status
+      created_at
+    }
+  }
+`;
+
+// 查詢需求者的完整資料（包含其建立的需求）
+export const GET_REQUESTER_WITH_REQUESTS = gql`
+  query GetRequesterWithRequests($id: uuid!) {
+    requesters_by_pk(id: $id) {
+      id
+      name
+      phone
+      organization
+      status
+      created_at
+      disaster_requests(order_by: { created_at: desc }) {
+        id
+        request_type
+        priority
+        village
+        street
+        contact_name
+        contact_phone
+        description
+        required_volunteers
+        status
+        created_at
+      }
+    }
+  }
+`;
+
+// 需求者統計
+export const GET_REQUESTER_STATS = gql`
+  query GetRequesterStats {
+    # 待審核
+    pending_requesters: requesters_aggregate(
+      where: { status: { _eq: "pending" } }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    
+    # 已核准
+    approved_requesters: requesters_aggregate(
+      where: { status: { _eq: "approved" } }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    
+    # 已拒絕
+    rejected_requesters: requesters_aggregate(
+      where: { status: { _eq: "rejected" } }
+    ) {
+      aggregate {
+        count
+      }
+    }
+  }
+`;

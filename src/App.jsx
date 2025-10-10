@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import AdminApp from './pages/AdminApp';
 import VolunteerApp from './pages/VolunteerApp';
+import RequesterApp from './pages/RequesterApp';
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
         <Route path="/" element={<AdminApp />} />
         <Route path="/admin" element={<AdminApp />} />
         <Route path="/volunteer" element={<VolunteerApp />} />
+        <Route path="/requester" element={<RequesterApp />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
