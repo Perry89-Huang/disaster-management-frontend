@@ -32,6 +32,14 @@ function NotFound() {
           >
             管理員端
           </Link>
+          
+          <Link 
+            to="/requester" 
+            className="inline-block bg-green-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition"
+          >
+            需求者
+          </Link>          
+          
           <Link 
             to="/volunteer" 
             className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition"
