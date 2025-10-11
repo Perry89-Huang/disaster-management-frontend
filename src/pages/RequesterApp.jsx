@@ -40,7 +40,6 @@ const LOGIN_REQUESTER = gql`
       where: {
         phone: { _eq: $phone }
         name: { _eq: $name }
-        status: { _eq: "approved" }
       }
       limit: 1
     ) {
@@ -48,6 +47,9 @@ const LOGIN_REQUESTER = gql`
       name
       phone
       organization
+      status
+      created_at
+      notes
       status
       created_at
     }
@@ -250,10 +252,19 @@ function RequesterAuth({ onLogin }) {
   React.useEffect(() => {
     if (loginData) {
       if (loginData.requesters && loginData.requesters.length > 0) {
-        onLogin(loginData.requesters[0]);
-        alert('✅ 登入成功！');
+        const requesterData = loginData.requesters[0];
+        onLogin(requesterData);
+        
+        // 根據狀態顯示不同的提示訊息
+        if (requesterData.status === 'approved') {
+          alert('✅ 登入成功！');
+        } else if (requesterData.status === 'pending') {
+          alert('⚠️ 登入成功\n您的帳號正在等待審核中\n在審核通過前，部分功能將受到限制');
+        } else if (requesterData.status === 'rejected') {
+          alert('⚠️ 登入成功\n很抱歉，您的帳號申請已被拒絕\n如有疑問請聯繫管理員');
+        }
       } else {
-        alert('❌ 登入失敗\n可能原因：\n1. 電話或姓名錯誤\n2. 帳號尚未審核通過\n3. 帳號已被拒絕');
+        alert('❌ 登入失敗\n電話或姓名錯誤');
       }
       setLoggingIn(false);
       setLoginData(null);
@@ -476,6 +487,47 @@ function RequesterDashboard({ requester, onLogout }) {
   const [editingRequest, setEditingRequest] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
 
+  // 根據狀態顯示不同的橫幅
+  const renderStatusBanner = () => {
+    const statusConfig = {
+      pending: {
+        icon: <Clock className="w-5 h-5" />,
+        title: '帳號審核中',
+        message: '您的帳號正在等待管理員審核，審核通過後即可建立需求',
+        className: 'bg-yellow-50 border-yellow-500 text-yellow-700'
+      },
+      rejected: {
+        icon: <XCircle className="w-5 h-5" />,
+        title: '帳號已被拒絕',
+        message: '很抱歉，您的帳號申請未通過審核。如有疑問，請聯繫管理員',
+        className: 'bg-red-50 border-red-500 text-red-700'
+      }
+    };
+
+    const config = statusConfig[requester.status];
+    if (!config) return null;
+
+    return (
+      <div className={`mb-6 p-4 border-l-4 rounded-lg ${config.className}`}>
+        <div className="flex items-start">
+          <div className="flex-shrink-0">{config.icon}</div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium">{config.title}</h3>
+            <div className="mt-2 text-sm">{config.message}</div>
+            {requester.notes && requester.status === 'rejected' && (
+              <div className="mt-2 text-sm bg-red-100 p-2 rounded">
+                <strong>拒絕原因：</strong> {requester.notes}
+              </div>
+            )}
+            <div className="mt-2 text-xs">
+              <strong>申請時間：</strong> {new Date(requester.created_at).toLocaleString('zh-TW')}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const { data, loading, error, refetch } = useQuery(GET_REQUESTER_WITH_REQUESTS, {
     variables: { id: requester.id },
     pollInterval: 10000
@@ -491,9 +543,12 @@ function RequesterDashboard({ requester, onLogout }) {
     completed: requests.filter(r => r.status === 'completed').length
   };
 
+  // 根據帳號狀態決定顯示哪些導航項目
   const navItems = [
-    { id: 'dashboard', label: '儀表板', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'requests', label: '我的需求', icon: <List className="w-5 h-5" /> },
+    ...(requester.status === 'approved' ? [
+      { id: 'dashboard', label: '儀表板', icon: <LayoutDashboard className="w-5 h-5" /> },
+      { id: 'requests', label: '我的需求', icon: <List className="w-5 h-5" /> },
+    ] : []),
     { id: 'profile', label: '個人資料', icon: <UserCircle className="w-5 h-5" /> }
   ];
 
@@ -519,30 +574,49 @@ function RequesterDashboard({ requester, onLogout }) {
 
     switch (currentPage) {
       case 'dashboard':
+        if (requester.status !== 'approved') {
+          setCurrentPage('profile');
+          return null;
+        }
         return (
-          <DashboardView 
-            stats={stats} 
-            requests={requests}
-            requesterData={requesterData}
-            onCreateRequest={() => setShowRequestForm(true)}
-          />
+          <>
+            {renderStatusBanner()}
+            <DashboardView 
+              stats={stats} 
+              requests={requests}
+              requesterData={requesterData}
+              onCreateRequest={() => requester.status === 'approved' ? setShowRequestForm(true) : alert('請等待帳號審核通過後再建立需求')}
+              isApproved={requester.status === 'approved'}
+            />
+          </>
         );
       case 'requests':
+        if (requester.status !== 'approved') {
+          setCurrentPage('profile');
+          return null;
+        }
         return (
-          <RequestsListView
-            requests={requests}
-            onEdit={(request) => setEditingRequest(request)}
-            onCreateRequest={() => setShowRequestForm(true)}
-            refetch={refetch}
-          />
+          <>
+            {renderStatusBanner()}
+            <RequestsListView
+              requests={requests}
+              onEdit={(request) => requester.status === 'approved' ? setEditingRequest(request) : alert('請等待帳號審核通過後再編輯需求')}
+              onCreateRequest={() => requester.status === 'approved' ? setShowRequestForm(true) : alert('請等待帳號審核通過後再建立需求')}
+              refetch={refetch}
+              isApproved={requester.status === 'approved'}
+            />
+          </>
         );
       case 'profile':
         return (
-          <ProfileView
-            requester={requesterData}
-            onClose={() => setCurrentPage('dashboard')}
-            refetch={refetch}
-          />
+          <>
+            {renderStatusBanner()}
+            <ProfileView
+              requester={requesterData}
+              onClose={() => setCurrentPage('dashboard')}
+              refetch={refetch}
+            />
+          </>
         );
       default:
         return null;
@@ -653,41 +727,60 @@ function DashboardView({ stats, requests, requesterData, onCreateRequest }) {
         </div>
       </div>
 
-      {/* 快速操作 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <button
-          onClick={onCreateRequest}
-          className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all border-2 border-transparent hover:border-red-200 text-left group"
-        >
-          <div className="flex items-center gap-4 mb-4">
-            <div className="bg-red-100 p-4 rounded-xl group-hover:bg-red-200 transition">
-              <Plus className="w-8 h-8 text-red-600" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800">建立新需求</h3>
-              <p className="text-gray-600 mt-1">填寫表單建立救災需求</p>
-            </div>
+      /* 快速操作 */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <button
+            onClick={onCreateRequest}
+            className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all border-2 border-transparent hover:border-red-200 text-left group"
+          >
+            <div className="flex items-center gap-4 mb-4">
+          <div className="bg-red-100 p-4 rounded-xl group-hover:bg-red-200 transition">
+            <Plus className="w-8 h-8 text-red-600" />
           </div>
-        </button>
+          <div>
+            <h3 className="text-xl font-bold text-gray-800">建立新需求</h3>
+            <p className="text-gray-600 mt-1">填寫表單建立救災需求</p>
+          </div>
+            </div>
+          </button>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-100">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="bg-blue-100 p-4 rounded-xl">
-              <FileText className="w-8 h-8 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800">帳戶資訊</h3>
-              <p className="text-gray-600 mt-1">已建立 {stats.total} 個需求</p>
-            </div>
+          <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-100">
+            <div className="flex items-center gap-4 mb-4">
+          <div className="bg-blue-100 p-4 rounded-xl">
+            <FileText className="w-8 h-8 text-blue-600" />
           </div>
-          <div className="space-y-2 text-sm text-gray-600">
-            <div>註冊時間: {new Date(requesterData?.created_at).toLocaleDateString('zh-TW')}</div>
-            <div>狀態: <span className="text-green-600 font-semibold">已核准</span></div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-800">帳戶資訊</h3>
+            <p className="text-gray-600 mt-1">已建立 {stats.total} 個需求</p>
+          </div>
+            </div>
+            <div className="space-y-2 text-sm text-gray-600">
+          <div>註冊時間: {new Date(requesterData?.created_at).toLocaleDateString('zh-TW')}</div>
+          <div>
+            狀態:{" "}
+            <span
+              className={
+            requesterData?.status === "approved"
+              ? "text-green-600 font-semibold"
+              : requesterData?.status === "pending"
+              ? "text-yellow-600 font-semibold"
+              : "text-red-600 font-semibold"
+              }
+            >
+              {requesterData?.status === "approved"
+            ? "已核准"
+            : requesterData?.status === "pending"
+            ? "審核中"
+            : requesterData?.status === "rejected"
+            ? "已拒絕"
+            : "未知"}
+            </span>
+          </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 最近的需求 */}
+        {/* 最近的需求 */}}
       {recentRequests.length > 0 && (
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">最近的需求</h3>
@@ -1009,6 +1102,39 @@ function ProfileView({ requester, onClose, refetch }) {
 
   return (
     <div className="space-y-6">
+      {/* 帳戶狀態卡片 */}
+      <div className={`bg-white rounded-2xl shadow-lg p-6 border-l-4 
+        ${requester.status === 'approved' ? 'border-green-500' : 
+          requester.status === 'pending' ? 'border-yellow-500' : 'border-red-500'}`}>
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-2xl font-bold text-gray-800">帳戶狀態</h2>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium
+                ${requester.status === 'approved' ? 'bg-green-100 text-green-800' : 
+                  requester.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                {requester.status === 'approved' ? '已審核通過' : 
+                 requester.status === 'pending' ? '審核中' : '已拒絕'}
+              </span>
+            </div>
+            
+            <div className="space-y-2 text-sm text-gray-600">
+              <p>
+                <strong>建立時間：</strong> 
+                {new Date(requester.created_at).toLocaleString('zh-TW')}
+              </p>
+              {requester.notes && requester.status === 'rejected' && (
+                <div className="mt-2 p-3 bg-red-50 rounded-lg">
+                  <strong className="text-red-700">拒絕原因：</strong>
+                  <p className="mt-1 text-red-600">{requester.notes}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 個人資料卡片 */}
       <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-red-600">
         <div className="flex items-center justify-between">
           <div>
@@ -1122,9 +1248,23 @@ function ProfileView({ requester, onClose, refetch }) {
                 value={new Date(requester?.created_at).toLocaleDateString('zh-TW')}
               />
               <InfoCard
-                icon={<CheckCircle className="w-5 h-5 text-green-600" />}
+                icon={
+                  requester?.status === 'approved'
+                    ? <CheckCircle className="w-5 h-5 text-green-600" />
+                    : requester?.status === 'pending'
+                    ? <Clock className="w-5 h-5 text-yellow-600" />
+                    : <XCircle className="w-5 h-5 text-red-600" />
+                }
                 label="帳戶狀態"
-                value="已核准"
+                value={
+                  requester?.status === 'approved'
+                    ? '已核准'
+                    : requester?.status === 'pending'
+                    ? '審核中'
+                    : requester?.status === 'rejected'
+                    ? '已拒絕'
+                    : '未知'
+                }
               />
             </div>
           </div>

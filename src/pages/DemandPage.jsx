@@ -58,16 +58,35 @@ const VOLUNTEER_APPLY_DEMAND = gql`
     $volunteer_id: uuid!
     $request_id: uuid!
   ) {
+    # 插入分配記錄
     insert_assignments_one(
       object: {
         volunteer_id: $volunteer_id
         request_id: $request_id
-        status: "pending"
+        status: "confirmed"
       }
     ) {
       id
       status
       assigned_at
+    }
+    
+    # 更新志工狀態
+    update_volunteers_by_pk(
+      pk_columns: { id: $volunteer_id }
+      _set: { status: "assigned" }
+    ) {
+      id
+      status
+    }
+
+    # 更新需求狀態
+    update_disaster_requests_by_pk(
+      pk_columns: { id: $request_id }
+      _set: { status: "in_progress" }
+    ) {
+      id
+      status
     }
   }
 `;
