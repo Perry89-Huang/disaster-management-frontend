@@ -238,19 +238,53 @@ function RequesterAuth({ onLogin }) {
     }
   });
 
-  const [loginRequester, { loading: loggingIn }] = useMutation(LOGIN_REQUESTER, {
-    onCompleted: (data) => {
-      if (data.requesters && data.requesters.length > 0) {
-        onLogin(data.requesters[0]);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [loginData, setLoginData] = useState(null);
+  const [loginError, setLoginError] = useState(null);
+
+  const { refetch: loginRequester } = useQuery(LOGIN_REQUESTER, {
+    variables: { phone: formData.phone, name: formData.name },
+    skip: true
+  });
+
+  React.useEffect(() => {
+    if (loginData) {
+      if (loginData.requesters && loginData.requesters.length > 0) {
+        onLogin(loginData.requesters[0]);
         alert('✅ 登入成功！');
       } else {
         alert('❌ 登入失敗\n可能原因：\n1. 電話或姓名錯誤\n2. 帳號尚未審核通過\n3. 帳號已被拒絕');
       }
-    },
-    onError: (error) => {
-      alert('❌ 登入失敗：' + error.message);
+      setLoggingIn(false);
+      setLoginData(null);
     }
-  });
+    if (loginError) {
+      alert('❌ 登入失敗：' + loginError.message);
+      setLoggingIn(false);
+      setLoginError(null);
+    }
+  }, [loginData, loginError, onLogin]);
+
+  const handleLogin = async () => {
+    if (!formData.phone || !formData.name) {
+      alert('請填寫電話和姓名');
+      return;
+    }
+    setLoggingIn(true);
+    try {
+      const { data } = await loginRequester({ 
+        variables: { 
+          phone: formData.phone, 
+          name: formData.name 
+        },
+        fetchPolicy: 'network-only' // 強制從網路獲取最新資料
+      });
+      setLoginData(data);
+    } catch (error) {
+      setLoginError(error);
+      setLoggingIn(false);
+    }
+  };
 
   const handleRegister = () => {
     if (!formData.name || !formData.phone) {
@@ -258,14 +292,6 @@ function RequesterAuth({ onLogin }) {
       return;
     }
     registerRequester({ variables: formData });
-  };
-
-  const handleLogin = () => {
-    if (!formData.phone || !formData.name) {
-      alert('請填寫電話和姓名');
-      return;
-    }
-    loginRequester({ variables: { phone: formData.phone, name: formData.name } });
   };
 
   return (
