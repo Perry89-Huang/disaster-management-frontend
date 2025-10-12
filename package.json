@@ -1,34 +1,30 @@
 {
+  "homepage": "/superman/",
   "name": "disaster-management-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-    "scripts": {
+  "scripts": {
     "comment": "========== 開發相關 ==========",
     "dev": "vite",
     "build": "vite build",
     "build:superman": "vite build --base=/superman/",
     "preview": "vite preview --base=/superman/",
     "preview:local": "vite preview",
-
-    
     "comment2": "========== E2E 測試 - 基本執行 ==========",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:headed": "playwright test --headed",
     "test:report": "playwright show-report",
-    
     "comment3": "========== E2E 測試 - 煙霧測試 ==========",
     "test:smoke": "playwright test smoke.spec.js",
     "test:smoke:headed": "playwright test smoke.spec.js --headed",
-    
     "comment4": "========== E2E 測試 - 志工管理 ==========",
     "test:volunteer": "playwright test volunteer-management.spec.js",
     "test:volunteer:simple": "playwright test volunteer-crud-simple.spec.js",
     "test:volunteer:ui": "playwright test volunteer-management.spec.js --ui",
     "test:volunteer:debug": "playwright test volunteer-management.spec.js --debug",
-    
     "comment5": "========== E2E 測試 - 需求管理 ==========",
     "test:request": "playwright test request-management.spec.js",
     "test:request:simple": "playwright test request-crud-simple.spec.js",
@@ -39,40 +35,32 @@
     "test:request:delete": "playwright test request-management.spec.js -g DELETE",
     "test:request:filter": "playwright test request-management.spec.js -g 篩選",
     "test:request:e2e": "playwright test request-management.spec.js -g E2E",
-    
     "comment6": "========== E2E 測試 - 志工認證 ==========",
     "test:auth": "playwright test auth.spec.js",
     "test:auth:ui": "playwright test auth.spec.js --ui",
-    
     "comment7": "========== E2E 測試 - 管理員完整測試 ==========",
     "test:admin": "playwright test e2e/admin/",
     "test:admin:simple": "playwright test e2e/admin/*-simple.spec.js",
     "test:admin:full": "playwright test e2e/admin/ --grep-invert simple",
-    
     "comment8": "========== E2E 測試 - 志工端測試 ==========",
     "test:volunteer-app": "playwright test e2e/volunteer/",
-    
     "comment9": "========== 測試工具腳本 ==========",
     "test:run": "node scripts/run-request-tests.js",
     "test:cleanup": "node scripts/cleanup-test-data.js",
     "test:install": "playwright install",
     "test:install:deps": "playwright install --with-deps",
-    
     "comment10": "========== CI/CD 測試 ==========",
     "test:ci": "playwright test --reporter=html,line",
     "test:ci:smoke": "playwright test smoke.spec.js --reporter=line",
     "test:ci:quick": "playwright test e2e/admin/*-simple.spec.js --reporter=line",
-    
     "comment11": "========== 測試覆蓋率和報告 ==========",
     "test:coverage": "playwright test --reporter=html,json",
     "test:results": "playwright show-report",
-    
     "comment12": "========== 快速測試組合 ==========",
     "test:quick": "npm run test:smoke && npm run test:volunteer:simple && npm run test:request:simple",
     "test:full": "npm run test:smoke && npm run test:volunteer && npm run test:request",
     "test:admin-full": "npm run test:volunteer && npm run test:request"
   },
-
   "dependencies": {
     "@apollo/client": "^3.14.0",
     "date-fns": "^4.1.0",
@@ -80,12 +68,12 @@
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^7.9.3"
+    "react-router-dom": "^7.9.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
     "@playwright/test": "^1.40.0",
-     "@types/node": "^20.10.0",
+    "@types/node": "^20.10.0",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
@@ -98,7 +86,6 @@
     "tailwindcss": "^3.4.17",
     "vite": "^7.1.7"
   },
-  
   "playwright": {
     "comment": "Playwright 配置參考 playwright.config.js"
   }

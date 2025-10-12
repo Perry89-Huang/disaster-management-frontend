@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { 
   Building2, Phone, User, FileText, CheckCircle, AlertCircle, 
@@ -214,10 +214,26 @@ export default function RequesterApp() {
   return <RequesterDashboard requester={requester} onLogout={handleLogout} />;
 }
 
+// 電話號碼格式驗證
+const validatePhoneNumber = (phone) => {
+  // 移除所有非數字字符
+  const cleanPhone = phone.replace(/\D/g, '');
+  // 檢查是否是10位數字且以09開頭
+  return /^09\d{8}$/.test(cleanPhone);
+};
+
+// 格式化電話號碼
+const formatPhoneNumber = (phone) => {
+  // 移除所有非數字字符
+  const cleanPhone = phone.replace(/\D/g, '');
+  return cleanPhone;
+};
+
 // ==================== 登入/註冊頁面 ====================
 
 function RequesterAuth({ onLogin }) {
   const [authMode, setAuthMode] = useState('login');
+  const [phoneError, setPhoneError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -281,6 +297,10 @@ function RequesterAuth({ onLogin }) {
       alert('請填寫電話和姓名');
       return;
     }
+    if (!validatePhoneNumber(formData.phone)) {
+      setPhoneError('請輸入正確的手機號碼格式：0988123456');
+      return;
+    }
     setLoggingIn(true);
     try {
       const { data } = await loginRequester({ 
@@ -300,6 +320,10 @@ function RequesterAuth({ onLogin }) {
   const handleRegister = () => {
     if (!formData.name || !formData.phone) {
       alert('請填寫姓名和電話');
+      return;
+    }
+    if (!validatePhoneNumber(formData.phone)) {
+      setPhoneError('請輸入正確的手機號碼格式：0988123456');
       return;
     }
     registerRequester({ variables: formData });
@@ -357,11 +381,24 @@ function RequesterAuth({ onLogin }) {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
-                    placeholder="0912-345-678"
+                    onChange={(e) => {
+                      const newPhone = formatPhoneNumber(e.target.value);
+                      setFormData({ ...formData, phone: newPhone });
+                      setPhoneError(validatePhoneNumber(newPhone) ? '' : '請輸入正確的手機號碼格式：0988123456');
+                    }}
+                    className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition ${
+                      phoneError ? 'border-red-500' : 'border-gray-200'
+                    }`}
+                    placeholder="0988123456"
                     disabled={loggingIn}
+                    maxLength="10"
                   />
+                  {phoneError && (
+                    <div className="mt-1 text-sm text-red-600 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {phoneError}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -402,6 +439,33 @@ function RequesterAuth({ onLogin }) {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                    <Phone className="w-4 h-4 mr-2 text-red-600" />電話號碼 <span className="text-red-600 ml-1">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => {
+                      const newPhone = formatPhoneNumber(e.target.value);
+                      setFormData({ ...formData, phone: newPhone });
+                      setPhoneError(validatePhoneNumber(newPhone) ? '' : '請輸入正確的手機號碼格式：0988123456');
+                    }}
+                    className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition ${
+                      phoneError ? 'border-red-500' : 'border-gray-200'
+                    }`}
+                    placeholder="0988123456"
+                    disabled={registering}
+                    maxLength="10"
+                  />
+                  {phoneError && (
+                    <div className="mt-1 text-sm text-red-600 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {phoneError}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                     <User className="w-4 h-4 mr-2 text-red-600" />姓名 <span className="text-red-600 ml-1">*</span>
                   </label>
                   <input
@@ -414,19 +478,6 @@ function RequesterAuth({ onLogin }) {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
-                    <Phone className="w-4 h-4 mr-2 text-red-600" />電話號碼 <span className="text-red-600 ml-1">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
-                    placeholder="0912-345-678"
-                    disabled={registering}
-                  />
-                </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
@@ -780,7 +831,7 @@ function DashboardView({ stats, requests, requesterData, onCreateRequest }) {
           </div>
         </div>
 
-        {/* 最近的需求 */}}
+        {/* 最近的需求 */}
       {recentRequests.length > 0 && (
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">最近的需求</h3>
@@ -1073,9 +1124,9 @@ function DetailRow({ label, value }) {
 function ProfileView({ requester, onClose, refetch }) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    name: requester?.name || '',
-    phone: requester?.phone || '',
-    organization: requester?.organization || ''
+    name: '',
+    phone: '',
+    organization: ''
   });
 
   const [updateRequester, { loading }] = useMutation(UPDATE_REQUESTER, {
@@ -1086,6 +1137,26 @@ function ProfileView({ requester, onClose, refetch }) {
     },
     onError: (error) => alert('❌ 更新失敗：' + error.message)
   });
+
+  // 當 requester 改變時更新表單數據
+  useEffect(() => {
+    if (requester) {
+      setFormData({
+        name: requester.name || '',
+        phone: requester.phone || '',
+        organization: requester.organization || ''
+      });
+    }
+  }, [requester]);
+
+  // 如果 requester 為 null，顯示載入中
+  if (!requester) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-8 h-8 text-red-600 animate-spin" />
+      </div>
+    );
+  }
 
   const handleSubmit = () => {
     if (!formData.name || !formData.phone) {
