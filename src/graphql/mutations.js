@@ -16,7 +16,7 @@ export const REGISTER_VOLUNTEER = gql`
         phone: $phone
         email: $email
         member_count: $member_count
-        status: "off"
+        status: "available"
       }
     ) {
       id

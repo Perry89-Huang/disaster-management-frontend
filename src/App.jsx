@@ -55,7 +55,7 @@ function HomePage({ onNavigate }) {
             </div>
             
             <div className="text-left">
-              <div className="text-5xl mb-4">💪</div>
+              <div className="text-5xl mb-4">💪 </div>
               <h3 className="text-2xl md:text-3xl font-bold mb-3">
                 我是鏟子超人
               </h3>
@@ -103,7 +103,8 @@ function HomePage({ onNavigate }) {
 
         {/* 底部資訊 */}
         <div className="mt-12 text-center text-gray-500 text-sm">
-          <p>© 2025 花蓮鏟子超人媒合系統 - 讓愛心與需求相遇的地方</p>
+          <p>花蓮鏟子超人媒合系統 - 讓愛心與需求相遇的地方</p>
+          <p >©2025 美魔力 - 發現台灣最美的風景</p>
         </div>
       </div>
     </div>
