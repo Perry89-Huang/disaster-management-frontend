@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Users, Heart, Menu, X, Home } from 'lucide-react';
+import { Users, Heart, Menu, X, Home, Shield } from 'lucide-react';
 import VolunteerApp from './pages/VolunteerApp';
 import RequesterApp from './pages/RequesterApp';
+import AdminApp from './pages/AdminApp';
 
 // 首頁組件
 function HomePage({ onNavigate }) {
@@ -104,7 +105,7 @@ function HomePage({ onNavigate }) {
         {/* 底部資訊 */}
         <div className="mt-12 text-center text-gray-500 text-sm">
           <p>花蓮鏟子超人媒合系統 - 讓愛心與需求相遇的地方</p>
-          <p >©2025 美魔力 - 發現台灣最美的風景</p>
+          <p>©2025 美魔力 - 發現台灣最美的風景</p>
         </div>
       </div>
     </div>
@@ -285,7 +286,7 @@ export default function App() {
   const handleNavigate = (page) => {
     console.log('🔄 導航到:', page);
     
-    // 如果要導航到 provider 或 request，切換到對應的完整應用
+    // 如果要導航到 provider、request 或 admin，切換到對應的完整應用
     if (page === 'provider') {
       console.log('✅ 切換到 VolunteerApp');
       setCurrentApp('volunteer');
@@ -295,6 +296,11 @@ export default function App() {
       console.log('✅ 切換到 RequesterApp');
       setCurrentApp('requester');
       setCurrentPage('request');
+      return;
+    } else if (page === 'admin') {
+      console.log('✅ 切換到 AdminApp');
+      setCurrentApp('admin');
+      setCurrentPage('admin');
       return;
     }
     
@@ -315,6 +321,8 @@ export default function App() {
         <VolunteerApp />
       ) : currentApp === 'requester' ? (
         <RequesterApp />
+      ) : currentApp === 'admin' ? (
+        <AdminApp />
       ) : (
         <>
           {/* 只有在首頁時不顯示導航列 */}
