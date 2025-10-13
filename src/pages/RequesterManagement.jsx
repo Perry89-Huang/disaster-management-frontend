@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, gql } from '@apollo/client';
-import { UserPlus, Check, X, Eye, AlertCircle, Building2, Phone, User, FileText, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { UserPlus, Check, X, Eye, AlertCircle, Building2, Phone, User, FileText, Clock, CheckCircle, XCircle, RefreshCw, Search } from 'lucide-react';
 
 // GraphQL 查詢所有需求者
 const GET_REQUESTERS = gql`
@@ -127,6 +127,9 @@ export default function RequesterManagement() {
   const [showForm, setShowForm] = useState(false);
   const [selectedRequester, setSelectedRequester] = useState(null);
   const [editingRequester, setEditingRequester] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // 查詢所有需求者
   const { data, loading, error, refetch } = useQuery(GET_REQUESTERS, {
@@ -188,11 +191,31 @@ export default function RequesterManagement() {
 
   const requesters = data?.requesters || [];
 
-  // 篩選需求者
+  // 搜尋和狀態過濾
   const filteredRequesters = requesters.filter(r => {
-    if (filter === 'all') return true;
-    return r.status === filter;
+    // 狀態過濾
+    if (filter !== 'all' && r.status !== filter) return false;
+    
+    // 搜尋過濾
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      r.name?.toLowerCase().includes(query) ||
+      r.phone?.toLowerCase().includes(query) ||
+      r.organization?.toLowerCase().includes(query)
+    );
   });
+
+  // 分頁計算
+  const totalPages = Math.ceil(filteredRequesters.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRequesters = filteredRequesters.slice(startIndex, endIndex);
+
+  // 當搜尋條件或篩選條件改變時，重置到第一頁
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filter]);
 
   // 統計
   const stats = {
@@ -283,7 +306,7 @@ export default function RequesterManagement() {
 
       {/* 篩選器 */}
       <div className="bg-white rounded-2xl shadow-lg p-4">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-4">
           {[
             { key: 'all', label: '全部' },
             { key: 'pending', label: '待審核' },
@@ -303,11 +326,36 @@ export default function RequesterManagement() {
             </button>
           ))}
         </div>
+
+        {/* 搜尋框 */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="搜尋姓名、電話或單位..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <div className="mt-2 text-sm text-gray-600">
+            找到 {filteredRequesters.length} 個需求者
+          </div>
+        )}
       </div>
 
       {/* 需求者列表 */}
       <div className="space-y-4">
-        {filteredRequesters.map(requester => (
+        {paginatedRequesters.map(requester => (
           <RequesterCard 
             key={requester.id}
             requester={requester}
@@ -323,10 +371,80 @@ export default function RequesterManagement() {
         {filteredRequesters.length === 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
             <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">目前沒有符合條件的需求者</p>
+            <p className="text-gray-500 text-lg">
+              {searchQuery ? '沒有符合搜尋條件的需求者' : '目前沒有符合條件的需求者'}
+            </p>
           </div>
         )}
       </div>
+
+      {/* 分頁控制 */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              第 {currentPage} / {totalPages} 頁，共 {filteredRequesters.length} 個需求者
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                上一頁
+              </button>
+              
+              {/* 頁碼按鈕 */}
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, index) => {
+                  const pageNum = index + 1;
+                  if (
+                    pageNum === 1 ||
+                    pageNum === totalPages ||
+                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-red-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  } else if (
+                    pageNum === currentPage - 2 ||
+                    pageNum === currentPage + 2
+                  ) {
+                    return <span key={pageNum} className="px-2 text-gray-400">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                下一頁
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 新增表單 */}
       {showForm && (

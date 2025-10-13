@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { gql } from '@apollo/client';
 import { 
@@ -102,6 +102,8 @@ export default function DemandPage({ volunteer, setVolunteer }) {
     village: 'all',
     search: ''
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // 每頁顯示10個需求
 
   // 查詢需求資料
   const { data, loading, error, refetch } = useQuery(GET_AVAILABLE_DEMANDS, {
@@ -151,6 +153,17 @@ export default function DemandPage({ volunteer, setVolunteer }) {
     }
     return true;
   });
+
+  // 分頁計算
+  const totalPages = Math.ceil(filteredDemands.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedDemands = filteredDemands.slice(startIndex, endIndex);
+
+  // 當篩選條件改變時，重置到第一頁
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters.search, filters.requestType, filters.priority, filters.village]);
 
   // 取得所有村落選項
   const villages = [...new Set(demands.map(d => d.village).filter(Boolean))];
@@ -213,8 +226,8 @@ export default function DemandPage({ volunteer, setVolunteer }) {
             color="orange"
           />
           <StatCard 
-            label="符合條件" 
-            value={filteredDemands.length}
+            label="全部需求" 
+            value={demands.length}
             color="blue"
           />
         </div>
@@ -257,41 +270,23 @@ export default function DemandPage({ volunteer, setVolunteer }) {
 
         {/* 進階篩選選項 */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
-            {/* 需求類型 */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                需求類型
-              </label>
-              <select
-                value={filters.requestType}
-                onChange={(e) => setFilters({ ...filters, requestType: e.target.value })}
-                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="all">全部類型</option>
-                <option value="志工">志工</option>
-                <option value="物資">物資</option>
-                <option value="志工+物資">志工+物資</option>
-              </select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
 
             {/* 優先順序 */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                優先順序
-              </label>
-              <select
-                value={filters.priority}
-                onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="all">全部優先度</option>
-                <option value="urgent">緊急</option>
-                <option value="high">高</option>
-                <option value="normal">普通</option>
-                <option value="low">低</option>
-              </select>
-            </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    優先順序
+                    </label>
+                    <select
+                    value={filters.priority}
+                    onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    >
+                    <option value="all">全部</option>
+                    <option value="urgent">緊急</option>
+                    <option value="normal">普通</option>
+                    </select>
+                  </div>
 
             {/* 村落 */}
             <div>
@@ -324,6 +319,12 @@ export default function DemandPage({ volunteer, setVolunteer }) {
             </button>
           </div>
         )}
+
+        {/* 結果統計 */}
+        <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-600">
+          顯示 {filteredDemands.length} 個需求
+          {filters.search && ` （搜尋：${filters.search}）`}
+        </div>
       </div>
 
       {/* 需求列表 */}
@@ -335,7 +336,7 @@ export default function DemandPage({ volunteer, setVolunteer }) {
             <p className="text-gray-600">請調整篩選條件或稍後再試</p>
           </div>
         ) : (
-          filteredDemands.map(demand => (
+          paginatedDemands.map(demand => (
             <DemandCard
               key={demand.id}
               demand={demand}
@@ -347,6 +348,75 @@ export default function DemandPage({ volunteer, setVolunteer }) {
           ))
         )}
       </div>
+
+      {/* 分頁控制 */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              第 {currentPage} / {totalPages} 頁，共 {filteredDemands.length} 個需求
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                上一頁
+              </button>
+              
+              {/* 頁碼按鈕 */}
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, index) => {
+                  const pageNum = index + 1;
+                  // 只顯示當前頁附近的頁碼
+                  if (
+                    pageNum === 1 ||
+                    pageNum === totalPages ||
+                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-red-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  } else if (
+                    pageNum === currentPage - 2 ||
+                    pageNum === currentPage + 2
+                  ) {
+                    return <span key={pageNum} className="px-2 text-gray-400">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                下一頁
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -421,7 +491,7 @@ function DemandCard({ demand, assignedCount, onApply, applying, volunteerStatus 
             <div className={`font-bold ${remainingVolunteers > 0 ? 'text-blue-600' : 'text-green-600'}`}>
               {assignedCount}/{demand.required_volunteers}
             </div>
-            <div className="text-gray-500 text-xs">已派遣</div>
+            <div className="text-gray-500 text-xs">人力需求</div>
           </div>
         </div>
       </div>

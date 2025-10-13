@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { 
   LayoutDashboard, Users, FileText, Building2, Send,
   UserPlus, Plus, Edit, Trash2, X, Eye, Check, 
   AlertCircle, Clock, CheckCircle, XCircle, Phone, User,
-  MapPin, AlertTriangle, RefreshCw, Power
+  MapPin, AlertTriangle, RefreshCw, Power, Search, Lock, LogOut
 } from 'lucide-react';
 
 // 導入需求者管理元件
@@ -234,7 +234,31 @@ const DELETE_REQUEST = gql`
 `;
 
 export default function AdminApp() {
+  const [admin, setAdmin] = useState(() => {
+    const saved = localStorage.getItem('admin');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [currentPage, setCurrentPage] = useState('儀表板');
+
+  // 保存管理员登入状态到 localStorage
+  useEffect(() => {
+    if (admin) {
+      localStorage.setItem('admin', JSON.stringify(admin));
+    } else {
+      localStorage.removeItem('admin');
+    }
+  }, [admin]);
+
+  const handleLogout = () => {
+    if (window.confirm('確定要登出嗎？')) {
+      setAdmin(null);
+    }
+  };
+
+  // 如果未登入，显示登入画面
+  if (!admin) {
+    return <AdminLogin onLogin={setAdmin} />;
+  }
 
   const tabs = [
     { name: '儀表板', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -270,8 +294,18 @@ export default function AdminApp() {
             <h1 className="text-2xl font-bold text-gray-800">
               花蓮縣光復救災資源管理系統
             </h1>
-            <div className="text-sm text-gray-600">
-              管理員模式
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-600">
+                <div className="font-semibold">{admin.username}</div>
+                <div className="text-xs text-gray-500">管理員</div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 px-4 py-2 rounded-lg font-semibold transition"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">登出</span>
+              </button>
             </div>
           </div>
         </div>
@@ -383,18 +417,7 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* 派單統計 */}
-      <div>
-        <h3 className="text-xl font-bold text-gray-800 mb-4">派單狀態</h3>
-        <div className="grid grid-cols-1 gap-4">
-          <StatCard
-            title="待確認派單"
-            value={stats.pendingAssignments}
-            color="orange"
-            icon={<Send />}
-          />
-        </div>
-      </div>
+
     </div>
   );
 }
@@ -423,6 +446,9 @@ function StatCard({ title, value, color, icon }) {
 function VolunteerManagementPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingVolunteer, setEditingVolunteer] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const { data, loading, error, refetch } = useQuery(GET_VOLUNTEERS, {
     pollInterval: 10000
@@ -453,6 +479,29 @@ function VolunteerManagementPage() {
   });
 
   const volunteers = data?.volunteers || [];
+
+  // 搜尋過濾
+  const filteredVolunteers = volunteers.filter(volunteer => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      volunteer.name?.toLowerCase().includes(query) ||
+      volunteer.phone?.toLowerCase().includes(query) ||
+      volunteer.nickname?.toLowerCase().includes(query) ||
+      volunteer.email?.toLowerCase().includes(query)
+    );
+  });
+
+  // 分頁計算
+  const totalPages = Math.ceil(filteredVolunteers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedVolunteers = filteredVolunteers.slice(startIndex, endIndex);
+
+  // 當搜尋條件改變時，重置到第一頁
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const handleDelete = (id, name) => {
     if (window.confirm(`確定要刪除志工「${name}」嗎？`)) {
@@ -495,6 +544,33 @@ function VolunteerManagementPage() {
         </div>
       </div>
 
+      {/* 搜尋框 */}
+      <div className="bg-white rounded-2xl shadow-lg p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="搜尋姓名、電話、暱稱或 Email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <div className="mt-2 text-sm text-gray-600">
+            找到 {filteredVolunteers.length} 個志工
+          </div>
+        )}
+      </div>
+
       {/* 志工列表 */}
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -509,7 +585,7 @@ function VolunteerManagementPage() {
               </tr>
             </thead>
             <tbody>
-              {volunteers.map((volunteer) => (
+              {paginatedVolunteers.map((volunteer) => (
                 <tr key={volunteer.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="font-semibold text-gray-800">{volunteer.name}</div>
@@ -546,13 +622,81 @@ function VolunteerManagementPage() {
               ))}
             </tbody>
           </table>
-          {volunteers.length === 0 && (
+          {paginatedVolunteers.length === 0 && (
             <div className="text-center py-12 text-gray-500">
-              目前沒有志工資料
+              {searchQuery ? '沒有符合搜尋條件的志工' : '目前沒有志工資料'}
             </div>
           )}
         </div>
       </div>
+
+      {/* 分頁控制 */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              第 {currentPage} / {totalPages} 頁，共 {filteredVolunteers.length} 個志工
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                上一頁
+              </button>
+              
+              {/* 頁碼按鈕 */}
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, index) => {
+                  const pageNum = index + 1;
+                  if (
+                    pageNum === 1 ||
+                    pageNum === totalPages ||
+                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-red-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  } else if (
+                    pageNum === currentPage - 2 ||
+                    pageNum === currentPage + 2
+                  ) {
+                    return <span key={pageNum} className="px-2 text-gray-400">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                下一頁
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 表單 */}
       {showForm && (
@@ -671,8 +815,27 @@ function VolunteerForm({ volunteer = null, onClose, onSubmit, isEdit = false }) 
               type="number"
               min="1"
               value={formData.member_count}
-              onChange={(e) => setFormData({ ...formData, member_count: parseInt(e.target.value) || 1 })}
+              onChange={(e) => {
+                const value = e.target.value;
+                // 允许空字符串以便用户可以清空输入框
+                if (value === '') {
+                  setFormData({ ...formData, member_count: '' });
+                } else {
+                  const num = parseInt(value);
+                  if (!isNaN(num) && num >= 1) {
+                    setFormData({ ...formData, member_count: num });
+                  }
+                }
+              }}
+              onBlur={() => {
+                // 失去焦点时，如果为空或小于1，设置为1
+                if (formData.member_count === '' || formData.member_count < 1) {
+                  setFormData({ ...formData, member_count: 1 });
+                }
+              }}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="請輸入可派遣人數"
+              inputMode="numeric"
             />
           </div>
 
@@ -727,6 +890,9 @@ function RequestManagementPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const { data, loading, error } = useQuery(GET_REQUESTS, {
     pollInterval: 10000
@@ -758,10 +924,33 @@ function RequestManagementPage() {
 
   const requests = data?.disaster_requests || [];
 
+  // 搜尋和狀態過濾
   const filteredRequests = requests.filter(r => {
-    if (filter === 'all') return true;
-    return r.status === filter;
+    // 狀態過濾
+    if (filter !== 'all' && r.status !== filter) return false;
+    
+    // 搜尋過濾
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      r.description?.toLowerCase().includes(query) ||
+      r.village?.toLowerCase().includes(query) ||
+      r.street?.toLowerCase().includes(query) ||
+      r.contact_name?.toLowerCase().includes(query) ||
+      r.contact_phone?.toLowerCase().includes(query)
+    );
   });
+
+  // 分頁計算
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+
+  // 當搜尋條件或篩選條件改變時，重置到第一頁
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filter]);
 
   const stats = {
     total: requests.length,
@@ -821,7 +1010,7 @@ function RequestManagementPage() {
 
       {/* 篩選器 */}
       <div className="bg-white rounded-2xl shadow-lg p-4">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-4">
           {[
             { key: 'all', label: '全部' },
             { key: 'pending', label: '待支援' },
@@ -841,11 +1030,36 @@ function RequestManagementPage() {
             </button>
           ))}
         </div>
+
+        {/* 搜尋框 */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="搜尋地址、描述或聯絡人..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <div className="mt-2 text-sm text-gray-600">
+            找到 {filteredRequests.length} 個需求
+          </div>
+        )}
       </div>
 
       {/* 需求列表 */}
       <div className="space-y-4">
-        {filteredRequests.map((request) => (
+        {paginatedRequests.map((request) => (
           <RequestCard
             key={request.id}
             request={request}
@@ -856,10 +1070,80 @@ function RequestManagementPage() {
         {filteredRequests.length === 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
             <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">目前沒有符合條件的需求</p>
+            <p className="text-gray-500 text-lg">
+              {searchQuery ? '沒有符合搜尋條件的需求' : '目前沒有符合條件的需求'}
+            </p>
           </div>
         )}
       </div>
+
+      {/* 分頁控制 */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              第 {currentPage} / {totalPages} 頁，共 {filteredRequests.length} 個需求
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                上一頁
+              </button>
+              
+              {/* 頁碼按鈕 */}
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, index) => {
+                  const pageNum = index + 1;
+                  if (
+                    pageNum === 1 ||
+                    pageNum === totalPages ||
+                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-red-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  } else if (
+                    pageNum === currentPage - 2 ||
+                    pageNum === currentPage + 2
+                  ) {
+                    return <span key={pageNum} className="px-2 text-gray-400">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                下一頁
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 表單 */}
       {showForm && (
@@ -1100,8 +1384,27 @@ function RequestForm({ request = null, onClose, onSubmit, isEdit = false }) {
                 type="number"
                 min="1"
                 value={formData.required_volunteers}
-                onChange={(e) => setFormData({ ...formData, required_volunteers: parseInt(e.target.value) || 1 })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // 允许空字符串以便用户可以清空输入框
+                  if (value === '') {
+                    setFormData({ ...formData, required_volunteers: '' });
+                  } else {
+                    const num = parseInt(value);
+                    if (!isNaN(num) && num >= 1) {
+                      setFormData({ ...formData, required_volunteers: num });
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  // 失去焦点时，如果为空或小于1，设置为1
+                  if (formData.required_volunteers === '' || formData.required_volunteers < 1) {
+                    setFormData({ ...formData, required_volunteers: 1 });
+                  }
+                }}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="請輸入需要的志工人數"
+                inputMode="numeric"
               />
             </div>
           </div>
@@ -1159,6 +1462,128 @@ function AssignmentManagementPage() {
       <Send className="w-16 h-16 text-gray-300 mx-auto mb-4" />
       <h3 className="text-2xl font-bold text-gray-800 mb-2">派單管理</h3>
       <p className="text-gray-600">此功能正在開發中...</p>
+    </div>
+  );
+}
+
+// ==================== 管理員登入畫面 ====================
+function AdminLogin({ onLogin }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    // 模拟登入验证（实际应该调用后端 API）
+    setTimeout(() => {
+      // 默认管理员账号
+      if (username === 'admin' && password === 'perryhuang') {
+        onLogin({
+          username: 'admin',
+          role: 'administrator',
+          loginTime: new Date().toISOString()
+        });
+      } else {
+        setError('帳號或密碼錯誤');
+      }
+      setLoading(false);
+    }, 800);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-red-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Logo & Title */}
+        <div className="text-center mb-8">
+          <div className="inline-block bg-white p-6 rounded-3xl shadow-2xl mb-6">
+            <Lock className="w-20 h-20 text-red-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            救災資源管理系統
+          </h1>
+          <p className="text-gray-600 text-lg">管理員登入</p>
+        </div>
+
+        {/* Login Form */}
+        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
+          <form onSubmit={handleLogin} className="space-y-6">
+            {/* Username */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                帳號
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
+                  placeholder="請輸入帳號"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                密碼
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
+                  placeholder="請輸入密碼"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+                  <p className="text-red-700 font-semibold">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Login Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                  登入中...
+                </div>
+              ) : (
+                '登入'
+              )}
+            </button>
+          </form>
+
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-6 text-sm text-gray-500">
+          <p>花蓮縣光復救災資源管理系統</p>
+          <p className="mt-1">© 2025 美魔力 - 發現台灣最美的風景</p>
+        </div>
+      </div>
     </div>
   );
 }

@@ -521,7 +521,7 @@ function PendingAssignmentCard({ assignment, volunteer, setVolunteer }) {
     <div className="border-2 border-blue-200 rounded-xl p-5 bg-gradient-to-r from-blue-50 to-white hover:shadow-lg transition-all">
       <div className="flex items-start justify-between mb-3">
         <span className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-bold">緊急</span>
-        <span className="text-xs text-gray-500">{new Date(assignment.assigned_at).toLocaleString('zh-TW')}</span>
+        <span className="text-xs text-gray-500">{new Date(assignment.assigned_at).toLocaleString('zh-TW', { hour12: false })}</span>
       </div>
       
       <div className="flex items-start space-x-2 mb-3">
@@ -649,7 +649,9 @@ function ConfirmedTaskCard({ assignment, volunteer, setVolunteer }) {
     <div className="border-2 border-green-200 rounded-xl p-5 bg-gradient-to-r from-green-50 to-white hover:shadow-lg transition-all">
       <div className="flex items-start justify-between mb-3">
         <span className="bg-green-600 text-white text-xs px-3 py-1 rounded-full font-bold">執行中</span>
-        <span className="text-xs text-gray-500">{new Date(assignment.confirmed_at).toLocaleString('zh-TW')}</span>
+        <span className="text-xs text-gray-500">
+          {new Date(assignment.confirmed_at || assignment.assigned_at).toLocaleString('zh-TW', { hour12: false })}
+        </span>
       </div>
       
       <div className="flex items-start space-x-2 mb-3">
@@ -750,7 +752,7 @@ function TasksPage({ volunteer, setVolunteer }) {
                 <div className="border-2 border-gray-200 rounded-xl p-5 bg-gray-50">
                   <div className="flex items-start justify-between mb-3">
                     <span className="bg-gray-600 text-white text-xs px-3 py-1 rounded-full font-bold">已完成</span>
-                    <span className="text-xs text-gray-500">{new Date(assignment.completed_at).toLocaleString('zh-TW')}</span>
+                    <span className="text-xs text-gray-500">{new Date(assignment.completed_at).toLocaleString('zh-TW', { hour12: false })}</span>
                   </div>
                   <div className="flex items-start space-x-2 mb-2">
                     <MapPin className="w-5 h-5 text-gray-600 flex-shrink-0 mt-0.5" />
@@ -841,21 +843,17 @@ function ProfilePage({ volunteer }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 gap-4 mb-6">
           <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200">
             <p className="text-3xl font-bold text-green-600">{completedTasks}</p>
             <p className="text-xs text-green-700 mt-1">完成任務數</p>
-          </div>
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-200">
-            <p className="text-3xl font-bold text-blue-600">{completedTasks * 3}</p>
-            <p className="text-xs text-blue-700 mt-1">服務時數</p>
           </div>
         </div>
       </div>
 
       <div className="text-center text-sm text-gray-500 py-4 space-y-1">
         <p className="font-semibold">花蓮縣光復救災資源管理系統</p>
-        <p>志工版 v2.0.0</p>
+        <p>志工版 v1.0.0</p>
         <p className="text-xs mt-2">© 2025 美魔力 - 發現台灣最美的風景</p>
       </div>
     </div>

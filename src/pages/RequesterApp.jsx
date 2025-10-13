@@ -4,7 +4,7 @@ import {
   Building2, Phone, User, FileText, CheckCircle, AlertCircle, 
   Clock, LogIn, UserPlus, ArrowRight, Plus, Edit, Trash2, X,
   LayoutDashboard, List, UserCircle, LogOut, MapPin, AlertTriangle,
-  RefreshCw, Eye, Check, XCircle
+  RefreshCw, Eye, Check, XCircle, Search, Users
 } from 'lucide-react';
 
 // ==================== GraphQL 定義 ====================
@@ -106,6 +106,15 @@ const GET_REQUESTER_WITH_REQUESTS = gql`
         status
         created_at
         notes
+        assignments(where: { status: { _in: ["pending", "confirmed", "completed"] } }) {
+          id
+          status
+          volunteer {
+            id
+            name
+            member_count
+          }
+        }
       }
     }
   }
@@ -889,6 +898,9 @@ function RequestSummaryCard({ request }) {
 function RequestsListView({ requests, onEdit, onCreateRequest, refetch }) {
   const [filter, setFilter] = useState('all');
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // 每頁顯示10個需求
 
   const [deleteRequest] = useMutation(DELETE_REQUEST, {
     onCompleted: () => {
@@ -898,10 +910,36 @@ function RequestsListView({ requests, onEdit, onCreateRequest, refetch }) {
     onError: (error) => alert('❌ 刪除失敗：' + error.message)
   });
 
+  // 篩選和搜尋邏輯
   const filteredRequests = requests.filter(r => {
-    if (filter === 'all') return true;
-    return r.status === filter;
+    // 狀態篩選
+    if (filter !== 'all' && r.status !== filter) return false;
+    
+    // 搜尋篩選
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        r.description?.toLowerCase().includes(searchLower) ||
+        r.village?.toLowerCase().includes(searchLower) ||
+        r.street?.toLowerCase().includes(searchLower) ||
+        r.contact_name?.toLowerCase().includes(searchLower) ||
+        r.contact_phone?.includes(searchTerm)
+      );
+    }
+    
+    return true;
   });
+
+  // 分頁邏輯
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+
+  // 當篩選條件改變時重置頁碼
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, searchTerm]);
 
   const handleDelete = (id, description) => {
     if (window.confirm(`確定要刪除需求「${description.substring(0, 20)}...」嗎？`)) {
@@ -935,8 +973,29 @@ function RequestsListView({ requests, onEdit, onCreateRequest, refetch }) {
         </div>
       </div>
 
-      {/* 篩選器 */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      {/* 搜尋和篩選器 */}
+      <div className="bg-white rounded-2xl shadow-lg p-6 space-y-4">
+        {/* 搜尋欄 */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="搜尋需求（地址、描述、聯絡人、電話）"
+            className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        {/* 狀態篩選器 */}
         <div className="flex flex-wrap gap-3">
           {filterOptions.map(({ value, label }) => (
             <button
@@ -952,11 +1011,17 @@ function RequestsListView({ requests, onEdit, onCreateRequest, refetch }) {
             </button>
           ))}
         </div>
+
+        {/* 結果統計 */}
+        <div className="text-sm text-gray-600">
+          顯示 {filteredRequests.length} 個需求
+          {searchTerm && ` （搜尋：${searchTerm}）`}
+        </div>
       </div>
 
       {/* 需求列表 */}
       <div className="space-y-4">
-        {filteredRequests.map((request) => (
+        {paginatedRequests.map((request) => (
           <RequestCard
             key={request.id}
             request={request}
@@ -969,10 +1034,81 @@ function RequestsListView({ requests, onEdit, onCreateRequest, refetch }) {
         {filteredRequests.length === 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
             <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">目前沒有符合條件的需求</p>
+            <p className="text-gray-500 text-lg">
+              {searchTerm ? `找不到包含「${searchTerm}」的需求` : '目前沒有符合條件的需求'}
+            </p>
           </div>
         )}
       </div>
+
+      {/* 分頁控制 */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              第 {currentPage} / {totalPages} 頁，共 {filteredRequests.length} 個需求
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                上一頁
+              </button>
+              
+              {/* 頁碼按鈕 */}
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, index) => {
+                  const pageNum = index + 1;
+                  // 只顯示當前頁附近的頁碼
+                  if (
+                    pageNum === 1 ||
+                    pageNum === totalPages ||
+                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  } else if (
+                    pageNum === currentPage - 2 ||
+                    pageNum === currentPage + 2
+                  ) {
+                    return <span key={pageNum} className="px-2 text-gray-400">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                下一頁
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 需求詳情 */}
       {selectedRequest && (
@@ -999,6 +1135,12 @@ function RequestCard({ request, onEdit, onDelete, onView }) {
 
   const priority = priorityConfig[request.priority] || priorityConfig.normal;
   const status = statusConfig[request.status] || statusConfig.pending;
+
+  // 計算已派遣人數
+  const assignedCount = request.assignments?.reduce((sum, assignment) => 
+    sum + (assignment.volunteer?.member_count || 1), 0
+  ) || 0;
+  const remainingVolunteers = request.required_volunteers - assignedCount;
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition">
@@ -1034,32 +1176,48 @@ function RequestCard({ request, onEdit, onDelete, onView }) {
             </div>
           </div>
         </div>
-        <div className="flex flex-col gap-2 ml-4">
-          <button
-            onClick={onView}
-            className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-lg transition"
-            title="查看詳情"
-          >
-            <Eye className="w-5 h-5" />
-          </button>
-          {request.status === 'pending' && (
-            <>
-              <button
-                onClick={onEdit}
-                className="text-green-600 hover:text-green-800 p-2 hover:bg-green-50 rounded-lg transition"
-                title="編輯"
-              >
-                <Edit className="w-5 h-5" />
-              </button>
-              <button
-                onClick={onDelete}
-                className="text-green-600 hover:text-green-800 p-2 hover:bg-green-50 rounded-lg transition"
-                title="刪除"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </>
-          )}
+
+        {/* 右側區域：人數狀態 + 操作按鈕 */}
+        <div className="flex flex-col gap-3 ml-4">
+          {/* 人數狀態 */}
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${remainingVolunteers > 0 ? 'bg-blue-50' : 'bg-green-50'}`}>
+            <Users className={`w-5 h-5 ${remainingVolunteers > 0 ? 'text-blue-600' : 'text-green-600'}`} />
+            <div className="text-sm">
+              <div className={`font-bold ${remainingVolunteers > 0 ? 'text-blue-600' : 'text-green-600'}`}>
+                {assignedCount}/{request.required_volunteers}
+              </div>
+              <div className="text-gray-500 text-xs">人力需求</div>
+            </div>
+          </div>
+
+          {/* 操作按鈕 */}
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={onView}
+              className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-lg transition"
+              title="查看詳情"
+            >
+              <Eye className="w-5 h-5" />
+            </button>
+            {request.status === 'pending' && (
+              <>
+                <button
+                  onClick={onEdit}
+                  className="text-green-600 hover:text-green-800 p-2 hover:bg-green-50 rounded-lg transition"
+                  title="編輯"
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={onDelete}
+                  className="text-green-600 hover:text-green-800 p-2 hover:bg-green-50 rounded-lg transition"
+                  title="刪除"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1082,6 +1240,11 @@ function RequestDetail({ request, onClose }) {
 
   const priority = priorityConfig[request.priority] || priorityConfig.normal;
   const status = statusConfig[request.status] || statusConfig.pending;
+
+  // 計算已派遣人數
+  const assignedCount = request.assignments?.reduce((sum, assignment) => 
+    sum + (assignment.volunteer?.member_count || 1), 0
+  ) || 0;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1113,6 +1276,7 @@ function RequestDetail({ request, onClose }) {
           <DetailRow label="聯絡人" value={request.contact_name} />
           <DetailRow label="聯絡電話" value={request.contact_phone} />
           <DetailRow label="需求人數" value={`${request.required_volunteers} 人`} />
+          <DetailRow label="已派遣人數" value={`${assignedCount} 人`} />
           <DetailRow label="需求描述" value={request.description} />
           {request.notes && <DetailRow label="備註" value={request.notes} />}
           <DetailRow label="建立時間" value={new Date(request.created_at).toLocaleString('zh-TW')} />
@@ -1539,8 +1703,27 @@ function RequestForm({ requesterId, request = null, onClose, onSuccess, isEdit =
               type="number"
               min="1"
               value={formData.required_volunteers}
-              onChange={(e) => setFormData({ ...formData, required_volunteers: parseInt(e.target.value) || 1 })}
+              onChange={(e) => {
+                const value = e.target.value;
+                // 允许空字符串以便用户可以清空输入框
+                if (value === '') {
+                  setFormData({ ...formData, required_volunteers: '' });
+                } else {
+                  const num = parseInt(value);
+                  if (!isNaN(num) && num >= 1) {
+                    setFormData({ ...formData, required_volunteers: num });
+                  }
+                }
+              }}
+              onBlur={() => {
+                // 失去焦点时，如果为空或小于1，设置为1
+                if (formData.required_volunteers === '' || formData.required_volunteers < 1) {
+                  setFormData({ ...formData, required_volunteers: 1 });
+                }
+              }}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="請輸入需要的志工人數"
+              inputMode="numeric"
             />
           </div>
 
