@@ -102,10 +102,19 @@ function HomePage({ onNavigate }) {
           </button>
         </div>
 
+
         {/* 底部資訊 */}
         <div className="mt-12 text-center text-gray-500 text-sm">
           <p>花蓮鏟子超人媒合系統 - 讓愛心與需求相遇的地方</p>
           <p>©2025 美魔力 - 發現台灣最美的風景</p>
+          {/* 管理者入口 */}
+          <button
+            onClick={() => onNavigate('admin')}
+            className="mt-4 text-gray-400 hover:text-gray-600 text-sm flex items-center justify-center mx-auto transition-colors"
+          >
+            <Shield size={14} className="mr-1" />
+            
+          </button>
         </div>
       </div>
     </div>

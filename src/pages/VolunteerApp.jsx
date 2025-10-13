@@ -7,6 +7,7 @@ import {
   CONFIRM_ASSIGNMENT,
   REJECT_ASSIGNMENT,
   COMPLETE_ASSIGNMENT,
+  COMPLETE_REQUEST,
   REGISTER_VOLUNTEER
 } from '../graphql/mutations';
 import { 
@@ -39,7 +40,12 @@ export default function VolunteerApp() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
-              <AlertCircle className="w-6 h-6" />
+              <img
+                src="/superman/images/superman-icon.png"
+                alt="鏟子超人"
+                className="w-8 h-8 md:w-12 md:h-12 object-contain"
+              />
+
             </div>
             <div>
               <h1 className="font-bold text-lg">鏟子超人 App</h1>
@@ -47,10 +53,6 @@ export default function VolunteerApp() {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <button className="relative hover:bg-white/20 p-2 rounded-lg transition">
-              <Bell className="w-6 h-6" />
-              <span className="absolute -top-1 -right-1 bg-yellow-400 text-blue-900 text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">0</span>
-            </button>
             <button onClick={handleLogout} className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg transition backdrop-blur-sm">
               <LogOut className="w-4 h-4" />
               <span className="text-sm font-medium hidden sm:inline">登出</span>
@@ -62,7 +64,7 @@ export default function VolunteerApp() {
       {/* 主要內容 */}
       <div className="max-w-7xl mx-auto p-4">
         {currentPage === 'home' && <HomePage volunteer={volunteer} setVolunteer={setVolunteer} />}
-        {currentPage === 'demands' && <DemandPage volunteer={volunteer} />}  
+        {currentPage === 'demands' && <DemandPage volunteer={volunteer} setVolunteer={setVolunteer} />}  
         {currentPage === 'tasks' && <TasksPage volunteer={volunteer} setVolunteer={setVolunteer} />}
         {currentPage === 'profile' && <ProfilePage volunteer={volunteer} />}
       </div>
@@ -360,7 +362,7 @@ function HomePage({ volunteer, setVolunteer }) {
   // V4: 志工上線 - 使用 GraphQL mutation
   const [goOnline, { loading: goingOnline }] = useMutation(VOLUNTEER_GO_ONLINE, {
     onCompleted: (data) => {
-      setVolunteer({ ...volunteer, status: 'available' });
+      setVolunteer(prev => ({ ...prev, status: 'available' }));
       alert('✅ 已成功上線！\n現在可以接收派單通知');
     },
     onError: (error) => {
@@ -372,7 +374,7 @@ function HomePage({ volunteer, setVolunteer }) {
   // V5: 志工下線 - 使用 GraphQL mutation
   const [goOffline, { loading: goingOffline }] = useMutation(VOLUNTEER_GO_OFFLINE, {
     onCompleted: (data) => {
-      setVolunteer({ ...volunteer, status: 'off' });
+      setVolunteer(prev => ({ ...prev, status: 'off' }));
       alert('✅ 已下線\n您將不會收到新的派單');
     },
     onError: (error) => {
@@ -419,11 +421,7 @@ function HomePage({ volunteer, setVolunteer }) {
         </div>
 
         {/* 任務統計 */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
-            <p className="text-blue-100 text-xs mb-1">待確認</p>
-            <p className="text-2xl font-bold">{loadingAssignments ? '...' : pendingCount}</p>
-          </div>
+        <div className="grid grid-cols-2 gap-4">
           <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
             <p className="text-blue-100 text-xs mb-1">進行中</p>
             <p className="text-2xl font-bold">{loadingAssignments ? '...' : confirmedCount}</p>
@@ -432,24 +430,6 @@ function HomePage({ volunteer, setVolunteer }) {
             <p className="text-blue-100 text-xs mb-1">已完成</p>
             <p className="text-2xl font-bold">{loadingAssignments ? '...' : completedCount}</p>
           </div>
-        </div>
-      </div>
-
-      {/* 待確認的派單 */}
-      <div className="bg-white rounded-2xl shadow-xl p-6 border-l-4 border-blue-600">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-          <AlertCircle className="w-6 h-6 text-blue-600 mr-2" />
-          待確認的派單
-        </h2>
-        <div className="space-y-4">
-          {assignments.filter(a => a.status === 'pending').map(assignment => (
-            <PendingAssignmentCard key={assignment.id} assignment={assignment} volunteer={volunteer} setVolunteer={setVolunteer} />
-          ))}
-          {assignments.filter(a => a.status === 'pending').length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <p>目前沒有待確認的派單</p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -478,28 +458,37 @@ function HomePage({ volunteer, setVolunteer }) {
 function PendingAssignmentCard({ assignment, volunteer, setVolunteer }) {
   // V1: 志工確認派單
   const [confirmAssignment, { loading: confirming }] = useMutation(CONFIRM_ASSIGNMENT, {
-    onCompleted: () => {
+    onCompleted: (data) => {
       alert('✅ 任務已確認\n• 您的狀態變更為「執行中」(assigned)\n• 請前往現場執行任務');
-      setVolunteer({ ...volunteer, status: 'assigned' });
+      // 使用函數式更新確保使用最新的 volunteer 狀態
+      const updatedStatus = data?.update_volunteers_by_pk?.status || 'assigned';
+      setVolunteer(prev => ({ ...prev, status: updatedStatus }));
     },
     onError: (error) => {
       console.error('確認派單失敗:', error);
       alert('確認派單失敗: ' + error.message);
     },
-    refetchQueries: [{ query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } }]
+    refetchQueries: [
+      { query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } },
+      { query: GET_VOLUNTEER_PROFILE, variables: { volunteer_id: volunteer.id } }
+    ]
   });
 
   // V2: 志工拒絕派單
   const [rejectAssignment, { loading: rejecting }] = useMutation(REJECT_ASSIGNMENT, {
-    onCompleted: () => {
+    onCompleted: (data) => {
       alert('❌ 任務已拒絕\n• 您的狀態恢復為「待工」(available)\n• 可繼續接收新派單');
-      setVolunteer({ ...volunteer, status: 'available' });
+      const updatedStatus = data?.update_volunteers_by_pk?.status || 'available';
+      setVolunteer(prev => ({ ...prev, status: updatedStatus }));
     },
     onError: (error) => {
       console.error('拒絕派單失敗:', error);
       alert('拒絕派單失敗: ' + error.message);
     },
-    refetchQueries: [{ query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } }]
+    refetchQueries: [
+      { query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } },
+      { query: GET_VOLUNTEER_PROFILE, variables: { volunteer_id: volunteer.id } }
+    ]
   });
 
   // ✅ 修正：移除 request_id 參數
@@ -548,21 +537,32 @@ function PendingAssignmentCard({ assignment, volunteer, setVolunteer }) {
         </div>
         <button onClick={handleCall} className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-all shadow-md">
           <Phone className="w-4 h-4" />
-          <span className="text-sm font-bold">{assignment.disaster_request?.contact_phone}</span>
         </button>
       </div>
 
-      <p className="text-sm text-gray-700 mb-4 line-clamp-2">{assignment.disaster_request?.description}</p>
-      
-      <div className="flex space-x-3">
-        <button onClick={handleAccept} disabled={confirming || rejecting} className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-xl font-bold transition-all shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
-          <Check className="w-5 h-5" />
-          <span>{confirming ? '處理中...' : '接受任務'}</span>
-        </button>
-        <button onClick={handleReject} disabled={confirming || rejecting} className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-          <XCircle className="w-5 h-5" />
-          <span>{rejecting ? '處理中...' : '拒絕'}</span>
-        </button>
+      {assignment.disaster_request?.notes && (
+        <div className="flex items-start space-x-2 mb-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs text-yellow-600 font-semibold">備註</p>
+            <p className="text-sm text-gray-800">{assignment.disaster_request.notes}</p>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <p className="text-sm text-gray-700 mb-4 line-clamp-2">{assignment.disaster_request?.description}</p>
+        
+        <div className="flex space-x-3">
+          <button onClick={handleAccept} disabled={confirming || rejecting} className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-xl font-bold transition-all shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+            <Check className="w-5 h-5" />
+            <span>{confirming ? '處理中...' : '接受任務'}</span>
+          </button>
+          <button onClick={handleReject} disabled={confirming || rejecting} className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <XCircle className="w-5 h-5" />
+            <span>{rejecting ? '處理中...' : '拒絕'}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -572,15 +572,62 @@ function PendingAssignmentCard({ assignment, volunteer, setVolunteer }) {
 function ConfirmedTaskCard({ assignment, volunteer, setVolunteer }) {
   // V3: 志工完成任務
   const [completeAssignment, { loading: completing }] = useMutation(COMPLETE_ASSIGNMENT, {
-    onCompleted: () => {
+    onCompleted: (data) => {
+      // 檢查是否需要將需求狀態更新為 completed
+      const request = data?.update_assignments_by_pk?.disaster_request;
+      if (request) {
+        // 計算已派遣的總人數
+        const assignedCount = request.assignments?.reduce((sum, a) => {
+          return sum + (a.volunteer?.member_count || 1);
+        }, 0) || 0;
+        
+        // 檢查是否所有派單都已完成
+        const allCompleted = request.assignments?.every(a => 
+          a.status === 'completed' || a.status === 'rejected'
+        );
+        
+        // 檢查人數是否已滿
+        const isFull = assignedCount >= request.required_volunteers;
+        
+        console.log('需求完成檢查:', {
+          requestId: request.id,
+          assignedCount,
+          requiredVolunteers: request.required_volunteers,
+          isFull,
+          allCompleted,
+          shouldComplete: isFull && allCompleted
+        });
+        
+        // 只有當人數已滿且所有派單都完成時，才更新需求狀態
+        if (isFull && allCompleted) {
+          completeRequest({
+            variables: { request_id: request.id }
+          });
+        }
+      }
+      
       alert('🎉 任務已完成！\n感謝您的協助\n• 您的狀態恢復為「待工」(available)\n• 可繼續接收新派單');
-      setVolunteer({ ...volunteer, status: 'available' });
+      const updatedStatus = data?.update_volunteers_by_pk?.status || 'available';
+      setVolunteer(prev => ({ ...prev, status: updatedStatus }));
     },
     onError: (error) => {
       console.error('完成任務失敗:', error);
       alert('完成任務失敗: ' + error.message);
     },
-    refetchQueries: [{ query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } }]
+    refetchQueries: [
+      { query: GET_VOLUNTEER_ASSIGNMENTS, variables: { volunteer_id: volunteer.id } },
+      { query: GET_VOLUNTEER_PROFILE, variables: { volunteer_id: volunteer.id } }
+    ]
+  });
+
+  // 單獨的 mutation 用於更新需求狀態
+  const [completeRequest] = useMutation(COMPLETE_REQUEST, {
+    onCompleted: () => {
+      console.log('需求已標記為完成');
+    },
+    onError: (error) => {
+      console.error('更新需求狀態失敗:', error);
+    }
   });
 
   const handleComplete = () => {
@@ -610,19 +657,34 @@ function ConfirmedTaskCard({ assignment, volunteer, setVolunteer }) {
         <p className="text-sm font-semibold text-gray-800">{assignment.disaster_request?.village} {assignment.disaster_request?.street}</p>
       </div>
 
-      <div className="flex items-center space-x-2 mb-3 bg-green-50 border border-green-200 rounded-lg p-3">
-        <User className="w-4 h-4 text-green-600 flex-shrink-0" />
+      <div className="flex items-center space-x-2 mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <User className="w-4 h-4 text-blue-600 flex-shrink-0" />
         <div className="flex-1">
-          <p className="text-xs text-green-600 font-semibold">需求人聯絡資訊</p>
+          <p className="text-xs text-blue-600 font-semibold">需求人聯絡資訊</p>
           <p className="text-sm font-bold text-gray-800">{assignment.disaster_request?.contact_name}</p>
         </div>
-        <button onClick={handleCall} className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-all shadow-md">
+        <button onClick={handleCall} className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-all shadow-md">
           <Phone className="w-4 h-4" />
           <span className="text-sm font-bold">{assignment.disaster_request?.contact_phone}</span>
         </button>
       </div>
+      <div className="flex items-center space-x-2 mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex-1">
+          <p className="text-xs text-yellow-600 font-semibold">需求描述</p>
+          <p className="text-sm text-gray-700 mb-4">{assignment.disaster_request?.description}</p>
+        </div>
+      </div>
 
-      <p className="text-sm text-gray-700 mb-4">{assignment.disaster_request?.description}</p>
+      {assignment.disaster_request?.notes && (
+        <div className="flex items-start space-x-2 mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex-1">
+            <p className="text-xs text-yellow-600 font-semibold">備註</p>
+            <p className="text-sm text-gray-800">{assignment.disaster_request.notes}</p>
+          </div>
+        </div>
+      )}
+
+      
       
       <button onClick={handleComplete} disabled={completing} className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 rounded-xl font-bold transition-all shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
         <CheckCircle className="w-5 h-5" />

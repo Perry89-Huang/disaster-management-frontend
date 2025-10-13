@@ -33,6 +33,34 @@ const REGISTER_REQUESTER = gql`
   }
 `;
 
+// 更新需求者資料
+const UPDATE_REQUESTER = gql`
+  mutation UpdateRequester(
+    $id: uuid!
+    $name: String
+    $phone: String
+    $organization: String
+    $notes: String
+  ) {
+    update_requesters_by_pk(
+      pk_columns: { id: $id }
+      _set: {
+        name: $name
+        phone: $phone
+        organization: $organization
+        notes: $notes
+      }
+    ) {
+      id
+      name
+      phone
+      organization
+      notes
+      status
+    }
+  }
+`;
+
 // 需求者登入查詢
 const LOGIN_REQUESTER = gql`
   query LoginRequester($phone: String!, $name: String!) {
@@ -62,6 +90,7 @@ const GET_REQUESTER_WITH_REQUESTS = gql`
       name
       phone
       organization
+      notes
       status
       created_at
       disaster_requests(order_by: { created_at: desc }) {
@@ -159,30 +188,6 @@ const DELETE_REQUEST = gql`
     delete_disaster_requests_by_pk(id: $id) {
       id
       description
-    }
-  }
-`;
-
-// 更新需求者資料
-const UPDATE_REQUESTER = gql`
-  mutation UpdateRequester(
-    $id: uuid!
-    $name: String
-    $phone: String
-    $organization: String
-  ) {
-    update_requesters_by_pk(
-      pk_columns: { id: $id }
-      _set: {
-        name: $name
-        phone: $phone
-        organization: $organization
-      }
-    ) {
-      id
-      name
-      phone
-      organization
     }
   }
 `;
@@ -872,7 +877,8 @@ function RequestSummaryCard({ request }) {
         <p className="text-sm text-gray-600 truncate">{request.description}</p>
       </div>
       <div className="text-xs text-gray-500 ml-4">
-        {new Date(request.created_at).toLocaleDateString('zh-TW')}
+        
+        {new Date(request.created_at).toLocaleString('zh-TW', { hour12: false })}
       </div>
     </div>
   );
@@ -982,9 +988,7 @@ function RequestsListView({ requests, onEdit, onCreateRequest, refetch }) {
 function RequestCard({ request, onEdit, onDelete, onView }) {
   const priorityConfig = {
     urgent: { label: '緊急', color: 'bg-green-600' },
-    high: { label: '高', color: 'bg-orange-500' },
     normal: { label: '普通', color: 'bg-blue-500' },
-    low: { label: '低', color: 'bg-gray-500' }
   };
 
   const statusConfig = {
@@ -1023,6 +1027,10 @@ function RequestCard({ request, onEdit, onDelete, onView }) {
             <div className="flex items-center gap-1">
               <Phone className="w-4 h-4" />
               {request.contact_phone}
+            </div>
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              {new Date(request.created_at).toLocaleString('zh-TW', { hour12: false })}
             </div>
           </div>
         </div>
@@ -1063,9 +1071,7 @@ function RequestCard({ request, onEdit, onDelete, onView }) {
 function RequestDetail({ request, onClose }) {
   const priorityConfig = {
     urgent: { label: '緊急', color: 'bg-green-600' },
-    high: { label: '高', color: 'bg-orange-500' },
     normal: { label: '普通', color: 'bg-blue-500' },
-    low: { label: '低', color: 'bg-gray-500' }
   };
 
   const statusConfig = {
@@ -1132,7 +1138,8 @@ function ProfileView({ requester, onClose, refetch }) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    organization: ''
+    organization: '',
+    notes: ''
   });
 
   const [updateRequester, { loading }] = useMutation(UPDATE_REQUESTER, {
@@ -1149,7 +1156,8 @@ function ProfileView({ requester, onClose, refetch }) {
       setFormData({
         name: requester.name || '',
         phone: requester.phone || '',
-        organization: requester.organization || ''
+        organization: requester.organization || '',
+        notes: requester.notes || ''
       });
     }
   }, [requester]);
@@ -1170,7 +1178,10 @@ function ProfileView({ requester, onClose, refetch }) {
     updateRequester({
       variables: {
         id: requester.id,
-        ...formData
+        name: formData.name,
+        phone: formData.phone,
+        organization: formData.organization,
+        notes: formData.notes
       }
     });
   };
@@ -1261,6 +1272,17 @@ function ProfileView({ requester, onClose, refetch }) {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">備註</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                rows="3"
+                placeholder="其他補充說明..."
+              />
+            </div>
+
             <div className="flex gap-3 pt-4">
               <button
                 onClick={() => setIsEditing(false)}
@@ -1278,41 +1300,51 @@ function ProfileView({ requester, onClose, refetch }) {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InfoCard
-              icon={<User className="w-5 h-5 text-green-600" />}
-              label="姓名"
-              value={requester.name}
-            />
-            <InfoCard
-              icon={<Phone className="w-5 h-5 text-green-600" />}
-              label="電話"
-              value={requester.phone}
-            />
-            <InfoCard
-              icon={<Building2 className="w-5 h-5 text-green-600" />}
-              label="單位/組織"
-              value={requester.organization || '未設定'}
-            />
-            <InfoCard
-              icon={
-                requester?.status === 'approved'
-                  ? <CheckCircle className="w-5 h-5 text-green-600" />
-                  : requester?.status === 'pending'
-                  ? <Clock className="w-5 h-5 text-yellow-600" />
-                  : <XCircle className="w-5 h-5 text-green-600" />
-              }
-              label="帳戶狀態"
-              value={
-                requester?.status === 'approved'
-                  ? '已核准'
-                  : requester?.status === 'pending'
-                  ? '審核中'
-                  : requester?.status === 'rejected'
-                  ? '已拒絕'
-                  : '未知'
-              }
-            />
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InfoCard
+                icon={<User className="w-5 h-5 text-green-600" />}
+                label="姓名"
+                value={requester.name}
+              />
+              <InfoCard
+                icon={<Phone className="w-5 h-5 text-green-600" />}
+                label="電話"
+                value={requester.phone}
+              />
+              <InfoCard
+                icon={<Building2 className="w-5 h-5 text-green-600" />}
+                label="單位/組織"
+                value={requester.organization || '未設定'}
+              />
+              <InfoCard
+                icon={
+                  requester.status === 'approved'
+                    ? <CheckCircle className="w-5 h-5 text-green-600" />
+                    : requester.status === 'pending'
+                    ? <Clock className="w-5 h-5 text-yellow-600" />
+                    : <XCircle className="w-5 h-5 text-green-600" />
+                }
+                label="帳戶狀態"
+                value={
+                  requester.status === 'approved'
+                    ? '已核准'
+                    : requester.status === 'pending'
+                    ? '審核中'
+                    : requester.status === 'rejected'
+                    ? '已拒絕'
+                    : '未知'
+                }
+              />
+            </div>
+            {/* 備註區塊 */}
+            <div className="col-span-2 bg-gray-50 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-5 h-5 text-green-600" />
+                <span className="text-sm font-semibold text-gray-600">備註</span>
+              </div>
+              <p className="text-gray-800 whitespace-pre-wrap">{requester.notes || '未設定'}</p>
+            </div>
           </div>
         )}
       </div>
@@ -1389,6 +1421,11 @@ function RequestForm({ requesterId, request = null, onClose, onSuccess, isEdit =
 
   const loading = creating || updating;
 
+  // 花蓮縣光復鄉村里清單
+  const villages = [
+    "光復鄉-光復村","光復鄉-東富村","光復鄉-西富村 ","光復鄉-南富村","光復鄉-北富村","光復鄉-大馬村","光復鄉-大華村","光復鄉-大豐村 ","光復鄉-大安村","光復鄉-大全村","光復鄉-大進村","光復鄉-佐倉村","光復鄉-森永村","鳳林鎮-長橋里","其他"
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -1416,9 +1453,7 @@ function RequestForm({ requesterId, request = null, onClose, onSuccess, isEdit =
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="志工">志工</option>
-                <option value="物資">物資</option>
-                <option value="設備">設備</option>
-                <option value="其他">其他</option>
+               
               </select>
             </div>
 
@@ -1432,9 +1467,7 @@ function RequestForm({ requesterId, request = null, onClose, onSuccess, isEdit =
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="urgent">緊急</option>
-                <option value="high">高</option>
                 <option value="normal">普通</option>
-                <option value="low">低</option>
               </select>
             </div>
           </div>
@@ -1444,25 +1477,28 @@ function RequestForm({ requesterId, request = null, onClose, onSuccess, isEdit =
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 村里 <span className="text-green-600">*</span>
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.village}
                 onChange={(e) => setFormData({ ...formData, village: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="例：光復村"
-              />
+              >
+                <option value="">請選擇村里</option>
+                {villages.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                街道 <span className="text-green-600">*</span>
+                街道 或 Google Map定位 <span className="text-green-600">*</span>
               </label>
               <input
                 type="text"
                 value={formData.street}
                 onChange={(e) => setFormData({ ...formData, street: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="例：中正路123號"
+                placeholder="中正路12號 或 https://maps.app.goo.gl/9JRe65YW1gUVPCR27?g_st=ipc"
               />
             </div>
           </div>

@@ -31,20 +31,22 @@ const GET_AVAILABLE_DEMANDS = gql`
       contact_name
       contact_phone
       description
+      notes
       required_volunteers
       status
       created_at
       assignments_aggregate(
-        where: { status: { _in: ["pending", "confirmed"] } }
+        where: { status: { _in: ["pending", "confirmed", "completed"] } }
       ) {
         aggregate {
           count
         }
       }
       assignments(
-        where: { status: { _in: ["pending", "confirmed"] } }
+        where: { status: { _in: ["pending", "confirmed", "completed"] } }
       ) {
         volunteer {
+          id
           member_count
         }
       }
@@ -58,12 +60,13 @@ const VOLUNTEER_APPLY_DEMAND = gql`
     $volunteer_id: uuid!
     $request_id: uuid!
   ) {
-    # 插入分配記錄
+    # 插入分配記錄（允許同一志工重複申請）
     insert_assignments_one(
       object: {
         volunteer_id: $volunteer_id
         request_id: $request_id
         status: "confirmed"
+        assigned_at: "now()"
       }
     ) {
       id
@@ -91,7 +94,7 @@ const VOLUNTEER_APPLY_DEMAND = gql`
   }
 `;
 
-export default function DemandPage({ volunteer }) {
+export default function DemandPage({ volunteer, setVolunteer }) {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     requestType: 'all',
@@ -107,8 +110,11 @@ export default function DemandPage({ volunteer }) {
 
   // 申請服務需求
   const [applyDemand, { loading: applying }] = useMutation(VOLUNTEER_APPLY_DEMAND, {
-    onCompleted: () => {
-      alert('✅ 申請成功！\n管理員將會審核您的申請');
+    onCompleted: (data) => {
+      alert('✅ 申請成功！');
+      // 更新志工狀態為執行中
+      const updatedStatus = data?.update_volunteers_by_pk?.status || 'assigned';
+      setVolunteer(prev => ({ ...prev, status: updatedStatus }));
       refetch();
     },
     onError: (error) => {
@@ -127,6 +133,10 @@ export default function DemandPage({ volunteer }) {
 
   // 篩選邏輯
   const filteredDemands = demands.filter(demand => {
+    // 排除人數已滿的需求
+    const assignedCount = getAssignedCount(demand);
+    if (assignedCount >= demand.required_volunteers) return false;
+    
     if (filters.requestType !== 'all' && demand.request_type !== filters.requestType) return false;
     if (filters.priority !== 'all' && demand.priority !== filters.priority) return false;
     if (filters.village !== 'all' && demand.village !== filters.village) return false;
@@ -455,6 +465,14 @@ function DemandCard({ demand, assignedCount, onApply, applying, volunteerStatus 
           </div>
         )}
 
+        {/* 備註 */}
+        {demand.notes && (
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <div className="text-sm text-gray-600 font-medium mb-1">備註</div>
+            <p className="text-gray-800 whitespace-pre-wrap">{demand.notes}</p>
+          </div>
+        )}
+
         {/* 時間 */}
         <div className="flex items-center text-sm text-gray-500">
           <Clock className="w-4 h-4 mr-2" />
@@ -477,7 +495,7 @@ function DemandCard({ demand, assignedCount, onApply, applying, volunteerStatus 
             {volunteerStatus !== 'available' ? (
               <>
                 <AlertCircle className="w-5 h-5" />
-                <span>請先上線</span>
+                <span>您正在值勤中...</span>
               </>
             ) : applying ? (
               <span>申請中...</span>

@@ -380,7 +380,6 @@ export const COMPLETE_ASSIGNMENT = gql`
   mutation CompleteAssignment(
     $assignment_id: uuid!
     $volunteer_id: uuid!
-    $request_id: uuid!
   ) {
     # 更新派單狀態：confirmed → completed
     update_assignments_by_pk(
@@ -393,6 +392,18 @@ export const COMPLETE_ASSIGNMENT = gql`
       id
       status
       completed_at
+      disaster_request {
+        id
+        required_volunteers
+        status
+        assignments(where: { status: { _in: ["pending", "confirmed", "completed"] } }) {
+          id
+          status
+          volunteer {
+            member_count
+          }
+        }
+      }
     }
     
     # 更新志工狀態：assigned → available
@@ -403,8 +414,12 @@ export const COMPLETE_ASSIGNMENT = gql`
       id
       status
     }
-    
-    # 更新需求狀態為 completed
+  }
+`;
+
+// 單獨的 mutation 用於更新需求狀態為完成
+export const COMPLETE_REQUEST = gql`
+  mutation CompleteRequest($request_id: uuid!) {
     update_disaster_requests_by_pk(
       pk_columns: { id: $request_id }
       _set: { status: "completed" }

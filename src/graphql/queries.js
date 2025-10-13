@@ -203,6 +203,7 @@ export const GET_VOLUNTEER_ASSIGNMENTS = gql`
         street
         contact_name
         contact_phone
+        notes
         priority
         request_type
       }
