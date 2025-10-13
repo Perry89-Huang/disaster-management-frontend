@@ -201,6 +201,40 @@ const DELETE_REQUEST = gql`
   }
 `;
 
+// 查詢志工統計資料
+const GET_VOLUNTEER_STATS = gql`
+  query GetVolunteerStats {
+    # 志工總人數
+    total_volunteers: volunteers_aggregate {
+      aggregate {
+        count
+      }
+    }
+    
+    # 今天註冊的志工
+    today_volunteers: volunteers_aggregate(
+      where: { 
+        created_at: { _gte: "{{TODAY_START}}" }
+      }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    
+    # 昨天註冊的志工
+    yesterday_volunteers: volunteers_aggregate(
+      where: { 
+        created_at: { _gte: "{{YESTERDAY_START}}", _lt: "{{TODAY_START}}" }
+      }
+    ) {
+      aggregate {
+        count
+      }
+    }
+  }
+`;
+
 // ==================== 主元件 ====================
 
 export default function RequesterApp() {
@@ -542,6 +576,27 @@ function RequesterDashboard({ requester, onLogout }) {
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null);
 
+  // 計算今天和昨天的日期
+  const getTodayStart = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.toISOString();
+  };
+
+  const getYesterdayStart = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    return yesterday.toISOString();
+  };
+
+  // 替換查詢中的日期佔位符
+  const queryWithDates = GET_VOLUNTEER_STATS.loc.source.body
+    .replace(/{{TODAY_START}}/g, getTodayStart())
+    .replace(/{{YESTERDAY_START}}/g, getYesterdayStart());
+
+  const VOLUNTEER_STATS_QUERY = gql`${queryWithDates}`;
+
   const { data: requesterData, loading, error, refetch } = useQuery(
     GET_REQUESTER_WITH_REQUESTS,
     {
@@ -550,12 +605,39 @@ function RequesterDashboard({ requester, onLogout }) {
     }
   );
 
+  // 查詢志工統計資料
+  const { data: volunteerStatsData, error: volunteerStatsError } = useQuery(
+    VOLUNTEER_STATS_QUERY,
+    {
+      pollInterval: 10000
+    }
+  );
+
+  // 調試：打印志工統計數據
+  useEffect(() => {
+    if (volunteerStatsData) {
+      console.log('志工統計數據:', volunteerStatsData);
+      console.log('今天開始時間:', getTodayStart());
+      console.log('昨天開始時間:', getYesterdayStart());
+    }
+    if (volunteerStatsError) {
+      console.error('志工統計查詢錯誤:', volunteerStatsError);
+    }
+  }, [volunteerStatsData, volunteerStatsError]);
+
   const requests = requesterData?.requesters_by_pk?.disaster_requests || [];
   const stats = {
     total: requests.length,
     pending: requests.filter(r => r.status === 'pending').length,
     in_progress: requests.filter(r => r.status === 'in_progress').length,
     completed: requests.filter(r => r.status === 'completed').length
+  };
+
+  // 志工統計
+  const volunteerStats = {
+    totalVolunteers: volunteerStatsData?.total_volunteers?.aggregate?.count || 0,
+    todayVolunteers: volunteerStatsData?.today_volunteers?.aggregate?.count || 0,
+    yesterdayVolunteers: volunteerStatsData?.yesterday_volunteers?.aggregate?.count || 0
   };
 
   const renderStatusBanner = () => {
@@ -631,6 +713,7 @@ function RequesterDashboard({ requester, onLogout }) {
               requesterData={requesterData?.requesters_by_pk}
               onCreateRequest={() => setShowRequestForm(true)}
               isApproved={requester.status === 'approved'}
+              volunteerStats={volunteerStats}
             />
           </>
         );
@@ -748,24 +831,55 @@ function RequesterDashboard({ requester, onLogout }) {
 
 // ==================== 儀表板視圖 ====================
 
-function DashboardView({ stats, requests, requesterData, onCreateRequest, isApproved }) {
+function DashboardView({ stats, requests, requesterData, onCreateRequest, isApproved, volunteerStats }) {
   const recentRequests = requests.slice(0, 5);
 
   return (
     <div className="space-y-6">
-      {/* 統計卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg">
-          <StatCard label="總需求數" value={stats.total} />
+      {/* 需求統計卡片 */}
+      <div>
+        <h3 className="text-lg font-bold text-gray-800 mb-3">我的需求統計</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg">
+            <StatCard label="總需求數" value={stats.total} />
+          </div>
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-6 text-white shadow-lg">
+            <StatCard label="待支援" value={stats.pending} />
+          </div>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
+            <StatCard label="進行中" value={stats.in_progress} />
+          </div>
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg">
+            <StatCard label="已完成" value={stats.completed} />
+          </div>
         </div>
-        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-6 text-white shadow-lg">
-          <StatCard label="待支援" value={stats.pending} />
-        </div>
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
-          <StatCard label="進行中" value={stats.in_progress} />
-        </div>
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg">
-          <StatCard label="已完成" value={stats.completed} />
+      </div>
+
+      {/* 志工統計卡片 */}
+      <div>
+        <h3 className="text-lg font-bold text-gray-800 mb-3">志工統計</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between mb-2">
+              <Users className="w-8 h-8 opacity-80" />
+              <div className="text-3xl font-bold">{volunteerStats.totalVolunteers}</div>
+            </div>
+            <div className="text-sm opacity-90 font-medium">志工總人數</div>
+          </div>
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between mb-2">
+              <UserPlus className="w-8 h-8 opacity-80" />
+              <div className="text-3xl font-bold">{volunteerStats.todayVolunteers}</div>
+            </div>
+            <div className="text-sm opacity-90 font-medium">今天新增志工</div>
+          </div>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between mb-2">
+              <UserPlus className="w-8 h-8 opacity-80" />
+              <div className="text-3xl font-bold">{volunteerStats.yesterdayVolunteers}</div>
+            </div>
+            <div className="text-sm opacity-90 font-medium">昨天新增志工</div>
+          </div>
         </div>
       </div>
 

@@ -13,7 +13,8 @@ import {
 import { 
   GET_VOLUNTEER_ASSIGNMENTS,
   VERIFY_VOLUNTEER,
-  GET_VOLUNTEER_PROFILE
+  GET_VOLUNTEER_PROFILE,
+  GET_DASHBOARD_STATS
 } from '../graphql/queries';
 import DemandPage from './DemandPage';
 
@@ -354,10 +355,27 @@ function HomePage({ volunteer, setVolunteer }) {
     }
   );
 
+  // 查詢系統統計資料
+  const { data: statsData, loading: loadingStats } = useQuery(
+    GET_DASHBOARD_STATS
+  );
+
   const assignments = assignmentsData?.assignments || [];
   const pendingCount = assignments.filter(a => a.status === 'pending').length;
   const confirmedCount = assignments.filter(a => a.status === 'confirmed').length;
   const completedCount = assignments.filter(a => a.status === 'completed').length;
+
+  // 計算系統統計
+  const totalVolunteers = (
+    (statsData?.available_volunteers?.aggregate?.count || 0) +
+    (statsData?.assigned_volunteers?.aggregate?.count || 0) +
+    (statsData?.offline_volunteers?.aggregate?.count || 0)
+  );
+
+  const totalRequests = (
+    (statsData?.pending_requests?.aggregate?.count || 0) +
+    (statsData?.in_progress_requests?.aggregate?.count || 0)
+  );
 
   // V4: 志工上線 - 使用 GraphQL mutation
   const [goOnline, { loading: goingOnline }] = useMutation(VOLUNTEER_GO_ONLINE, {
@@ -421,7 +439,7 @@ function HomePage({ volunteer, setVolunteer }) {
         </div>
 
         {/* 任務統計 */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
             <p className="text-blue-100 text-xs mb-1">進行中</p>
             <p className="text-2xl font-bold">{loadingAssignments ? '...' : confirmedCount}</p>
@@ -429,6 +447,18 @@ function HomePage({ volunteer, setVolunteer }) {
           <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
             <p className="text-blue-100 text-xs mb-1">已完成</p>
             <p className="text-2xl font-bold">{loadingAssignments ? '...' : completedCount}</p>
+          </div>
+        </div>
+
+        {/* 系統統計 */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
+            <p className="text-blue-100 text-xs mb-1">志工總人數</p>
+            <p className="text-2xl font-bold">{loadingStats ? '...' : totalVolunteers}</p>
+          </div>
+          <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
+            <p className="text-blue-100 text-xs mb-1">需求總數</p>
+            <p className="text-2xl font-bold">{loadingStats ? '...' : totalRequests}</p>
           </div>
         </div>
       </div>

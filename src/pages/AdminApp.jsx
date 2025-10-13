@@ -52,6 +52,35 @@ const GET_DASHBOARD_STATS = gql`
         count
       }
     }
+    
+    # 志工總人數
+    total_volunteers: volunteers_aggregate {
+      aggregate {
+        count
+      }
+    }
+    
+    # 今天註冊的志工
+    today_volunteers: volunteers_aggregate(
+      where: { 
+        created_at: { _gte: "{{TODAY_START}}" }
+      }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    
+    # 昨天註冊的志工
+    yesterday_volunteers: volunteers_aggregate(
+      where: { 
+        created_at: { _gte: "{{YESTERDAY_START}}", _lt: "{{TODAY_START}}" }
+      }
+    ) {
+      aggregate {
+        count
+      }
+    }
   }
 `;
 
@@ -343,7 +372,28 @@ export default function AdminApp() {
 
 // ==================== 儀表板頁面 ====================
 function DashboardPage() {
-  const { data, loading, error } = useQuery(GET_DASHBOARD_STATS, {
+  // 計算今天和昨天的日期
+  const getTodayStart = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.toISOString();
+  };
+
+  const getYesterdayStart = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    return yesterday.toISOString();
+  };
+
+  // 替換查詢中的日期佔位符
+  const queryWithDates = GET_DASHBOARD_STATS.loc.source.body
+    .replace(/{{TODAY_START}}/g, getTodayStart())
+    .replace(/{{YESTERDAY_START}}/g, getYesterdayStart());
+
+  const DASHBOARD_QUERY = gql`${queryWithDates}`;
+
+  const { data, loading, error } = useQuery(DASHBOARD_QUERY, {
     pollInterval: 10000
   });
 
@@ -368,7 +418,10 @@ function DashboardPage() {
     assignedVolunteers: data?.assigned_volunteers?.aggregate?.count || 0,
     pendingRequests: data?.pending_requests?.aggregate?.count || 0,
     inProgressRequests: data?.in_progress_requests?.aggregate?.count || 0,
-    pendingAssignments: data?.pending_assignments?.aggregate?.count || 0
+    pendingAssignments: data?.pending_assignments?.aggregate?.count || 0,
+    totalVolunteers: data?.total_volunteers?.aggregate?.count || 0,
+    todayVolunteers: data?.today_volunteers?.aggregate?.count || 0,
+    yesterdayVolunteers: data?.yesterday_volunteers?.aggregate?.count || 0
   };
 
   return (
@@ -379,7 +432,32 @@ function DashboardPage() {
         <p className="text-red-100">即時監控救災資源與派遣狀況</p>
       </div>
 
-      {/* 志工統計 */}
+      {/* 志工統計 - 新增總人數和增長統計 */}
+      <div>
+        <h3 className="text-xl font-bold text-gray-800 mb-4">志工統計</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCard
+            title="志工總人數"
+            value={stats.totalVolunteers}
+            color="purple"
+            icon={<Users />}
+          />
+          <StatCard
+            title="今天新增志工"
+            value={stats.todayVolunteers}
+            color="green"
+            icon={<UserPlus />}
+          />
+          <StatCard
+            title="昨天新增志工"
+            value={stats.yesterdayVolunteers}
+            color="blue"
+            icon={<UserPlus />}
+          />
+        </div>
+      </div>
+
+      {/* 志工狀態 */}
       <div>
         <h3 className="text-xl font-bold text-gray-800 mb-4">志工狀態</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -428,7 +506,8 @@ function StatCard({ title, value, color, icon }) {
     blue: 'from-blue-500 to-blue-600',
     red: 'from-red-500 to-red-600',
     yellow: 'from-yellow-500 to-yellow-600',
-    orange: 'from-orange-500 to-orange-600'
+    orange: 'from-orange-500 to-orange-600',
+    purple: 'from-purple-500 to-purple-600'
   };
 
   return (
