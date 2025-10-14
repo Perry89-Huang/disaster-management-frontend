@@ -1646,7 +1646,7 @@ function InfoCard({ icon, label, value }) {
 
 function RequestForm({ requesterId, request = null, onClose, onSuccess, isEdit = false }) {
   const [formData, setFormData] = useState(request || {
-    request_type: '志工',
+    request_type: '一般志工',
     priority: 'normal',
     village: '',
     street: '',
@@ -1659,7 +1659,7 @@ function RequestForm({ requesterId, request = null, onClose, onSuccess, isEdit =
 
   const [createRequest, { loading: creating }] = useMutation(CREATE_REQUEST, {
     onCompleted: () => {
-      alert('✅ 需求建立成功！\n管理員將會安排志工協助');
+      alert('✅ 需求建立成功！\n志工將會協助處理您的需求');
       onSuccess();
     },
     onError: (error) => alert('❌ 建立失敗：' + error.message)
@@ -1730,8 +1730,11 @@ function RequestForm({ requesterId, request = null, onClose, onSuccess, isEdit =
                 onChange={(e) => setFormData({ ...formData, request_type: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
-                <option value="志工">志工</option>
-               
+                <option value="一般志工">一般志工</option>
+                <option value="專業技術">專業技術</option>
+                <option value="機具">機具</option>
+                <option value="醫療照護">醫療照護</option>
+                <option value="義廚">義廚</option>
               </select>
             </div>
 

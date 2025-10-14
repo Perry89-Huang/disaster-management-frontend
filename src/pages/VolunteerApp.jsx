@@ -86,17 +86,42 @@ export default function VolunteerApp() {
 // 認證畫面（登入/註冊）
 function AuthScreen({ onLogin }) {
   const [mode, setMode] = useState('login');
+  
+  // 從 localStorage 讀取保存的登入資訊
+  const getSavedLoginInfo = () => {
+    try {
+      const saved = localStorage.getItem('volunteerLoginInfo');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('讀取保存的登入資訊失敗:', error);
+    }
+    return { phone: '', name: '' };
+  };
+
   const [formData, setFormData] = useState({
-    phone: '',
-    name: '',
+    phone: getSavedLoginInfo().phone || '',
+    name: getSavedLoginInfo().name || '',
     email: '',
     member_count: 1
   });
+
+  // 保存登入資訊到 localStorage
+  const saveLoginInfo = (phone, name) => {
+    try {
+      localStorage.setItem('volunteerLoginInfo', JSON.stringify({ phone, name }));
+    } catch (error) {
+      console.error('保存登入資訊失敗:', error);
+    }
+  };
 
   const [verifyVolunteer, { loading: verifying }] = useLazyQuery(VERIFY_VOLUNTEER, {
     onCompleted: (data) => {
       if (data.volunteers.length > 0) {
         const volunteer = data.volunteers[0];
+        // 保存成功登入的資訊
+        saveLoginInfo(formData.phone, formData.name);
         alert(`✅ 登入成功！\n歡迎回來，${volunteer.name}`);
         onLogin(volunteer);
       } else {
@@ -111,6 +136,8 @@ function AuthScreen({ onLogin }) {
     {
       onCompleted: (data) => {
         const newVolunteer = data.insert_volunteers_one;
+        // 保存註冊成功的資訊
+        saveLoginInfo(formData.phone, formData.name);
         alert(`✅ 註冊成功！\n歡迎加入，${newVolunteer.name}\n\n您的資料：\n• 姓名：${newVolunteer.name}\n• 電話：${newVolunteer.phone}\n• 可派遣人數：${newVolunteer.member_count} 人\n\n現在可以開始接受派單了！`);
         onLogin(newVolunteer);
       },
@@ -260,6 +287,13 @@ function AuthScreen({ onLogin }) {
                 <span>{verifying ? '登入中...' : '登入'}</span>
                 {!verifying && <ArrowRight className="w-5 h-5" />}
               </button>
+              
+              {/* 提示信息 */}
+              {formData.phone && formData.name && (
+                <div className="text-center text-xs text-gray-500 -mt-2">
+                  <p>✓ 您的登入資訊已保存，下次會自動填入</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -303,11 +337,23 @@ function AuthScreen({ onLogin }) {
                   <Users className="w-4 h-4 mr-2 text-blue-600" />可派遣人數
                 </label>
                 <input 
-                  type="number" 
-                  min="1" 
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.member_count} 
-                  onChange={(e) => setFormData({ ...formData, member_count: parseInt(e.target.value) || 1 })} 
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    // 允許暫時為空字串，方便編輯
+                    setFormData({ ...formData, member_count: value === '' ? '' : parseInt(value) || 1 });
+                  }}
+                  onBlur={() => {
+                    // 失去焦點時，如果為空或小於1，設為1
+                    if (formData.member_count === '' || formData.member_count < 1) {
+                      setFormData({ ...formData, member_count: 1 });
+                    }
+                  }}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  placeholder="1"
                   disabled={registering}
                 />
               </div>
@@ -507,7 +553,7 @@ function PendingAssignmentCard({ assignment, volunteer, setVolunteer }) {
   // V2: 志工拒絕派單
   const [rejectAssignment, { loading: rejecting }] = useMutation(REJECT_ASSIGNMENT, {
     onCompleted: (data) => {
-      alert('❌ 任務已拒絕\n• 您的狀態恢復為「待工」(available)\n• 可繼續接收新派單');
+      alert('❌ 任務已拒絕\n• 您的狀態恢復為「待工」\n• 可繼續服務新的需求');
       const updatedStatus = data?.update_volunteers_by_pk?.status || 'available';
       setVolunteer(prev => ({ ...prev, status: updatedStatus }));
     },
@@ -636,7 +682,7 @@ function ConfirmedTaskCard({ assignment, volunteer, setVolunteer }) {
         }
       }
       
-      alert('🎉 任務已完成！\n感謝您的協助\n• 您的狀態恢復為「待工」(available)\n• 可繼續接收新派單');
+      alert('🎉 任務已完成！\n感謝您的協助\n• 您的狀態恢復為「待工」\n• 可繼續服務新的需求');
       const updatedStatus = data?.update_volunteers_by_pk?.status || 'available';
       setVolunteer(prev => ({ ...prev, status: updatedStatus }));
     },

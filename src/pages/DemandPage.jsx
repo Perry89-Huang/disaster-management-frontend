@@ -175,7 +175,7 @@ export default function DemandPage({ volunteer, setVolunteer }) {
       return;
     }
     
-    if (window.confirm('確定要申請此服務需求嗎？')) {
+    if (window.confirm('請先電話聯繫確認此需求，\n確定要服務此需求嗎？')) {
       applyDemand({
         variables: {
           volunteer_id: volunteer.id,
