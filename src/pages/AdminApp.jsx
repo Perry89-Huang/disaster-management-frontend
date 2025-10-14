@@ -6,6 +6,7 @@ import {
   AlertCircle, Clock, CheckCircle, XCircle, Phone, User,
   MapPin, AlertTriangle, RefreshCw, Power, Search, Lock, LogOut
 } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
 // 導入需求者管理元件
 import RequesterManagement from './RequesterManagement';
@@ -315,6 +316,13 @@ export default function AdminApp() {
   };
 
   return (
+    <>
+      <Helmet>
+        <title>管理員後台 | 花蓮鏟子超人媒合系統</title>
+        <meta name="description" content="系統管理後台 - 志工管理、需求管理、派單管理、統計總覽" />
+        <meta property="og:title" content="管理員後台 | 花蓮鏟子超人媒合系統" />
+      </Helmet>
+
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50">
       {/* Header */}
       <div className="bg-white shadow-lg border-b border-gray-200">
@@ -367,6 +375,7 @@ export default function AdminApp() {
         {renderContent()}
       </div>
     </div>
+    </>
   );
 }
 

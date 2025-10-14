@@ -1,52 +1,34 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-TW">
   <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SSQ869FW9R"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-SSQ869FW9R');
-    </script>
-
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/images/shovel2.png" type="image/png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#3b82f6" />
-    <meta name="description" content="鏟子超人救災管理系統 - 快速連結志工與救災需求，提供即時派遣與任務管理功能。">
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicon-16x16.png">  
-    <link rel="manifest" href="%PUBLIC_URL%/site.webmanifest" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>鏟子超人 | 救災管理系統</title>
+    <meta charset="UTF-8" />
+    
+    <!-- 網頁 Icon - 使用您的鏟子超人圖示 -->
+    <link rel="icon" type="image/png" href="/superman/images/superman-icon.png" />
+    
+    <!-- 手機版 Icon -->
+    <link rel="apple-touch-icon" href="/superman/images/superman-icon.png" />
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- 網頁標題 -->
+    <title>花蓮鏟子超人媒合系統</title>
+    
+    <!-- SEO Meta 標籤 -->
+    <meta name="description" content="連結需求與服務,讓愛心遍布花蓮。提供志工服務媒合、需求登錄等功能。" />
+    <meta name="keywords" content="花蓮,志工,媒合,鏟子超人,服務,救災" />
+    
+    <!-- Open Graph (社群分享) -->
+    <meta property="og:title" content="花蓮鏟子超人媒合系統" />
+    <meta property="og:description" content="連結需求與服務,讓愛心遍布花蓮" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/superman/images/superman.png" />
+    
+    <!-- 主題顏色（手機版） -->
+    <meta name="theme-color" content="#2563eb" />
   </head>
   <body>
-    <noscript>鏟子超人 - 救災管理系統</noscript>
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

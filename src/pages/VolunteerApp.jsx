@@ -17,6 +17,7 @@ import {
   GET_DASHBOARD_STATS
 } from '../graphql/queries';
 import DemandPage from './DemandPage';
+import { Helmet } from 'react-helmet-async';
 
 
 // 主應用程式元件
@@ -35,6 +36,13 @@ export default function VolunteerApp() {
   }
 
   return (
+    <>
+      <Helmet>
+        <title>服務提供者管理 | 花蓮鏟子超人媒合系統</title>
+        <meta name="description" content="志工服務管理系統 - 接受任務、查看進度、完成服務" />
+        <meta property="og:title" content="服務提供者管理 | 花蓮鏟子超人媒合系統" />
+      </Helmet>
+
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20">
       {/* 頂部導航 */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 shadow-xl sticky top-0 z-50">
@@ -80,6 +88,7 @@ export default function VolunteerApp() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

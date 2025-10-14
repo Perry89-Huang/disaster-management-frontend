@@ -6,6 +6,7 @@ import {
   LayoutDashboard, List, UserCircle, LogOut, MapPin, AlertTriangle,
   RefreshCw, Eye, Check, XCircle, Search, Users
 } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
 // ==================== GraphQL 定義 ====================
 
@@ -257,7 +258,19 @@ export default function RequesterApp() {
     return <RequesterAuth onLogin={handleLogin} />;
   }
 
-  return <RequesterDashboard requester={requester} onLogout={handleLogout} />;
+  return (
+    <>
+      <Helmet>
+        <title>需求管理 App | 花蓮鏟子超人媒合系統</title>
+        <meta name="description" content="需求者管理系統 - 登入、註冊、查看服務進度" />
+        <meta property="og:title" content="需求管理 App | 花蓮鏟子超人媒合系統" />
+      </Helmet>
+
+      <div className="min-h-screen bg-gradient-to-br from-green-500 via-green-600 to-emerald-600">
+        <RequesterDashboard requester={requester} onLogout={handleLogout} />
+      </div>
+    </>
+  );
 }
 
 // 電話號碼格式驗證
