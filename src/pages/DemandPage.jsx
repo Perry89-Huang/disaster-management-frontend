@@ -35,16 +35,11 @@ const GET_AVAILABLE_DEMANDS = gql`
       required_volunteers
       status
       created_at
-      assignments_aggregate(
-        where: { status: { _in: ["pending", "confirmed", "completed"] } }
-      ) {
-        aggregate {
-          count
-        }
-      }
       assignments(
         where: { status: { _in: ["pending", "confirmed", "completed"] } }
       ) {
+        id
+        status
         volunteer {
           id
           member_count

@@ -429,7 +429,9 @@ function HomePage({ volunteer, setVolunteer }) {
 
   const totalRequests = (
     (statsData?.pending_requests?.aggregate?.count || 0) +
-    (statsData?.in_progress_requests?.aggregate?.count || 0)
+    (statsData?.in_progress_requests?.aggregate?.count || 0) +
+    (statsData?.completed_requests?.aggregate?.count || 0) +
+    (statsData?.cancelled_requests?.aggregate?.count || 0)
   );
 
   // V4: 志工上線 - 使用 GraphQL mutation
@@ -512,7 +514,7 @@ function HomePage({ volunteer, setVolunteer }) {
             <p className="text-2xl font-bold">{loadingStats ? '...' : totalVolunteers}</p>
           </div>
           <div className="bg-white bg-opacity-20 rounded-xl p-3 backdrop-blur-sm text-center">
-            <p className="text-blue-100 text-xs mb-1">需求總數</p>
+            <p className="text-blue-100 text-xs mb-1">全部需求總數</p>
             <p className="text-2xl font-bold">{loadingStats ? '...' : totalRequests}</p>
           </div>
         </div>
